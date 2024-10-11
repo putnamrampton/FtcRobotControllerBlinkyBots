@@ -64,7 +64,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  */
 
 @TeleOp(name="Basic: Omni Linear OpMode", group="Linear OpMode")
-@Disabled
+//@Disabled
 public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
 
     // Declare OpMode members for each of the 4 motors.
@@ -122,6 +122,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
             double leftBackPower   = axial - lateral + yaw;
             double rightBackPower  = axial + lateral - yaw;
 
+
             // Normalize the values so no wheel power exceeds 100%
             // This ensures that the robot maintains the desired motion.
             max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
@@ -133,6 +134,14 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 rightFrontPower /= max;
                 leftBackPower   /= max;
                 rightBackPower  /= max;
+            }
+            boolean testMode = true;
+            int divider = 3;
+            if(testMode) {
+                leftFrontPower /= divider;
+                rightFrontPower /= divider;
+                leftBackPower /= divider;
+                rightBackPower /= divider;
             }
 
             // This is test code:
