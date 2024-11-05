@@ -29,10 +29,12 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /*
@@ -74,7 +76,39 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
 
-    @Override
+    //telescoping arm
+    private DcMotor armDrive = null;
+
+    //servo claw
+    static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
+    static final int    CYCLE_MS    =   50;     // period of each cycle
+    static final double MAX_POS     =  1.0;     // Maximum rotational position
+    static final double MIN_POS     =  0.0;     // Minimum rotational position
+
+    // Define class members
+    Servo   servo;
+    double  position = .70;  //(MAX_POS - MIN_POS) / 2; // Start at halfway position
+    //boolean rampUp = true;
+
+/*
+ *  The code is written using a method called: encoderDrive(speed, leftInches, rightInches, timeoutS)
+ *  that performs the actual movement.
+ *  This method assumes that each movement is relative to the last stopping place.
+ *  There are other ways to perform encoder based moves, but this method is probably the simplest.
+ *  This code uses the RUN_TO_POSITION mode to enable the Motor controllers to generate the run profile
+ */
+
+    /*
+    static final double     COUNTS_PER_MOTOR_REV    = 1440 ;    // eg: TETRIX Motor Encoder
+    static final double     DRIVE_GEAR_REDUCTION    = 1.0 ;     // No External Gearing.
+    static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
+    static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
+            (WHEEL_DIAMETER_INCHES * 3.1415);
+    static final double     DRIVE_SPEED             = 0.6;
+    static final double     TURN_SPEED              = 0.5;
+    */
+
+        @Override
     public void runOpMode() {
 
         // Initialize the hardware variables. Note that the strings used here must correspond
@@ -84,75 +118,138 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
         rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
 
-        // ########################################################################################
-        // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
-        // ########################################################################################
-        // Most robots need the motors on one side to be reversed to drive forward.
-        // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
-        // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
-        // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
-        // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
-        // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
-        // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
-        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
-        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+        //add config for new motor (telescoping arm)
+        armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
 
-        // Wait for the game to start (driver presses START)
-        telemetry.addData("Status", "Initialized");
+        armDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        // Connect to servo (Assume Robot Left Hand)
+        // Change the text in quotes to match any servo name on your robot.
+        servo = hardwareMap.get(Servo.class, "left_hand");
+
+
+        // Send telemetry message to indicate successful Encoder reset
+        telemetry.addData("Arm location starting at",  "%7d",
+                armDrive.getCurrentPosition());
+
+            // Wait for the start button
+        //telemetry.addData(">", "Press Start to scan Servo." );
         telemetry.update();
-
         waitForStart();
-        runtime.reset();
+
+
+
+
+            // ########################################################################################
+            // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
+            // ########################################################################################
+            // Most robots need the motors on one side to be reversed to drive forward.
+            // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
+            // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
+            // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
+            // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
+            // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
+            // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
+            leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+            leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
+            rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+            rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+
+            // Set direction for the telescoping arm
+            armDrive.setDirection(DcMotor.Direction.REVERSE);
+
+            // Wait for the game to start (driver presses START)
+            telemetry.addData("Status", "Initialized");
+            telemetry.update();
+
+            waitForStart();
+            runtime.reset();
+
+            int targetTicks = 0;
+
+            //start with the claw closed
+            //boolean clawOpen= false;
 
         // run until the end of the match (driver presses STOP)
-        while (opModeIsActive()) {
-            double max;
+            while (opModeIsActive()) {
+                double max;
+                double max2;
 
-            // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
-            double axial   = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
-            double lateral =  gamepad1.left_stick_x;
-            double yaw     =  gamepad1.right_stick_x;
+                // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
+                double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
+                double lateral = gamepad1.left_stick_x;
+                double yaw = gamepad1.right_stick_x;
 
-            // Combine the joystick requests for each axis-motion to determine each wheel's power.
-            // Set up a variable for each drive wheel to save the power level for telemetry.
-            double leftFrontPower  = axial + lateral + yaw;
-            double rightFrontPower = axial - lateral - yaw;
-            double leftBackPower   = axial - lateral + yaw;
-            double rightBackPower  = axial + lateral - yaw;
+                // Combine the joystick requests for each axis-motion to determine each wheel's power.
+                // Set up a variable for each drive wheel to save the power level for telemetry.
+                double leftFrontPower = axial + lateral + yaw;
+                double rightFrontPower = axial - lateral - yaw;
+                double leftBackPower = axial - lateral + yaw;
+                double rightBackPower = axial + lateral - yaw;
+
+                //gamepad2 - control the arms - left joystick up to extend, down to retract
+                //double axial2 = -gamepad2.left_stick_y;  // Note: pushing stick forward gives negative value
+
+                //calculate arm power based on joystick from gamepad2
+                //double armPower = axial2/2;
+                if (gamepad2.dpad_down) {
+                    targetTicks = 0;
+                } else if (gamepad2.dpad_up) {
+                    targetTicks = 3700;
+                    //Depends where our goal position is for the arm - this will intel our final target tick amount
+                }
 
 
-            // Normalize the values so no wheel power exceeds 100%
-            // This ensures that the robot maintains the desired motion.
-            max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
-            max = Math.max(max, Math.abs(leftBackPower));
-            max = Math.max(max, Math.abs(rightBackPower));
 
-            if (max > 1.0) {
-                leftFrontPower  /= max;
-                rightFrontPower /= max;
-                leftBackPower   /= max;
-                rightBackPower  /= max;
-            }
-            boolean testMode = true;
-            int divider = 3;
-            if(testMode) {
-                leftFrontPower /= divider;
-                rightFrontPower /= divider;
-                leftBackPower /= divider;
-                rightBackPower /= divider;
-            }
+                //gamepad2 - control claw intake - a pressed for open
+                boolean buttonAPressed = gamepad2.a;  // A gamepad 2
 
-            // This is test code:
-            //
-            // Uncomment the following code to test your motor directions.
-            // Each button should make the corresponding motor run FORWARD.
-            //   1) First get all the motors to take to correct positions on the robot
-            //      by adjusting your Robot Configuration if necessary.
-            //   2) Then make sure they run in the correct direction by modifying the
-            //      the setDirection() calls above.
-            // Once the correct motors move in the correct direction re-comment this code.
+                //gamepad2 - control claw intake - b pressed for close
+                boolean buttonBPressed = gamepad2.b;  // B gamepad 2
+
+                // Control claw movement through buttons
+                if (buttonAPressed) { //open the claw
+                    position = 1.00;
+                } else if (buttonBPressed) { //close the claw
+                    position = 0.70;
+                }
+
+
+
+                // Normalize the values so no wheel power exceeds 100%
+                // This ensures that the robot maintains the desired motion.
+                max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+                max = Math.max(max, Math.abs(leftBackPower));
+                max = Math.max(max, Math.abs(rightBackPower));
+
+                if (max > 1.0) {
+                    leftFrontPower /= max;
+                    rightFrontPower /= max;
+                    leftBackPower /= max;
+                    rightBackPower /= max;
+                }
+
+                int divider = 3;
+                // if button LB is pressed, the speed will increase
+                boolean buttonLBPressed = gamepad1.left_bumper;  // B gamepad 1
+                if (buttonLBPressed == false) {
+                    leftFrontPower /= divider;
+                    rightFrontPower /= divider;
+                    leftBackPower /= divider;
+                    rightBackPower /= divider;
+                }
+
+                // This is test code:
+                //
+                // Uncomment the following code to test your motor directions.
+                // Each button should make the corresponding motor run FORWARD.
+                //   1) First get all the motors to take to correct positions on the robot
+                //      by adjusting your Robot Configuration if necessary.
+                //   2) Then make sure they run in the correct direction by modifying the
+                //      the setDirection() calls above.
+                // Once the correct motors move in the correct direction re-comment this code.
 
             /*
             leftFrontPower  = gamepad1.x ? 1.0 : 0.0;  // X gamepad
@@ -161,16 +258,98 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
             rightBackPower  = gamepad1.b ? 1.0 : 0.0;  // B gamepad
             */
 
-            // Send calculated power to wheels
-            leftFrontDrive.setPower(leftFrontPower);
-            rightFrontDrive.setPower(rightFrontPower);
-            leftBackDrive.setPower(leftBackPower);
-            rightBackDrive.setPower(rightBackPower);
+                // Send calculated power to wheels
+                leftFrontDrive.setPower(leftFrontPower);
+                rightFrontDrive.setPower(rightFrontPower);
+                leftBackDrive.setPower(leftBackPower);
+                rightBackDrive.setPower(rightBackPower);
 
-            // Show the elapsed game time and wheel power.
-            telemetry.addData("Status", "Run Time: " + runtime.toString());
-            telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
-            telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
+                // Send calculated power to telescoping arm
+                //armDrive.setPower(armPower);
+
+                encoderDrive(0.5, targetTicks, 2);
+
+                // Show the elapsed game time and wheel power.
+                telemetry.addData("Status", "Run Time: " + runtime.toString());
+                telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
+                telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
+                telemetry.addData("Arm", "%7d", targetTicks);
+                telemetry.update();
+
+                // Display the current value
+                telemetry.addData("Servo Max", "%5.2f", MAX_POS);
+                telemetry.addData("Servo Min", "%5.2f", MIN_POS);
+                telemetry.addData("Servo Position", "%5.2f", position);
+                telemetry.addData(">", "Press Stop to end test.");
+                telemetry.update();
+
+                // Set the servo to the new position and pause;
+                servo.setPosition(position);
+
+                sleep(CYCLE_MS);
+                idle();
+            }
+
+            // Signal done;
+            telemetry.addData(">", "Done");
             telemetry.update();
         }
+
+    /*
+     *  Method to perform a move to an exact position, based on encoder counts.
+     *  Move will stop if any of three conditions occur:
+     *  1) Move gets to the desired position
+     *  2) Move runs out of time
+     *  3) Driver stops the OpMode running.
+     */
+    public void encoderDrive(double speed,
+                             int targetTicks,
+                             double timeoutS) {
+        //if your already at the target do nothing
+        if (armDrive.getCurrentPosition() == targetTicks) {
+            return;
+        }
+        // Ensure that the OpMode is still active
+        if (opModeIsActive()) {
+
+            armDrive.setTargetPosition(targetTicks);
+
+            // Turn On RUN_TO_POSITION
+            armDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // reset the timeout time and start motion.
+            runtime.reset();
+            armDrive.setPower(Math.abs(speed));
+
+            //TODO: figure out how to include the while (opModeISActive() loop in code above
+            //the encoder resolution is 537.7 PPR, this is for a 19.2:1 gear ratio
+            //initial guess for fully extending the slide: about 15,000 - WAY TO MUCH
+
+            // keep looping while we are still active, and there is time left, and both motors are running.
+            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
+            // its target position, the motion will stop.  This is "safer" in the event that the robot will
+            // always end the motion as soon as possible.
+            // However, if you require that BOTH motors have finished their moves before the robot continues
+            // onto the next step, use (isBusy() || isBusy()) in the loop test.
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    armDrive.isBusy()) {
+
+                // Display it for the driver.
+                telemetry.addData("Running telescoping arm to",  " %7d", targetTicks);
+                telemetry.addData("Currently at",  " at %7d",
+                        armDrive.getCurrentPosition());
+                telemetry.update();
+            }
+
+            // Stop all motion;
+            armDrive.setPower(0);
+
+            // Turn off RUN_TO_POSITION
+            armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        }
+
     }}
+
+
