@@ -86,8 +86,10 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
     static final double MIN_POS     =  0.0;     // Minimum rotational position
 
     // Define class members
-    Servo   servo;
-    double  position = .70;  //(MAX_POS - MIN_POS) / 2; // Start at halfway position
+    Servo   clawServo;
+    Servo   hingeServo;
+    double  clawPosition = .70;  //(MAX_POS - MIN_POS) / 2; // Start at halfway position
+    double  hingePosition = 0.70;
     //boolean rampUp = true;
 
 /*
@@ -120,23 +122,24 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
 
         //add config for new motor (telescoping arm)
         armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
-
-        armDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
-        armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        armDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        //armDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // Connect to servo (Assume Robot Left Hand)
         // Change the text in quotes to match any servo name on your robot.
-        servo = hardwareMap.get(Servo.class, "left_hand");
+        clawServo = hardwareMap.get(Servo.class, "claw_hand");
 
+        // Connect to servo
+        hingeServo = hardwareMap.get(Servo.class, "arm_hinge");
 
         // Send telemetry message to indicate successful Encoder reset
-        telemetry.addData("Arm location starting at",  "%7d",
-                armDrive.getCurrentPosition());
+        //telemetry.addData("Arm location starting at",  "%7d",
+                //armDrive.getCurrentPosition());
 
             // Wait for the start button
-        //telemetry.addData(">", "Press Start to scan Servo." );
-        telemetry.update();
+        // telemetry.addData(">", "Press Start to scan Servo." );
+        // telemetry.update();
         waitForStart();
 
 
@@ -167,7 +170,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
             waitForStart();
             runtime.reset();
 
-            int targetTicks = 0;
+            //int targetTicks = 0;
 
             //start with the claw closed
             //boolean clawOpen= false;
@@ -175,7 +178,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
         // run until the end of the match (driver presses STOP)
             while (opModeIsActive()) {
                 double max;
-                double max2;
+                //double max2;
 
                 // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
                 double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
@@ -190,16 +193,20 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 double rightBackPower = axial + lateral - yaw;
 
                 //gamepad2 - control the arms - left joystick up to extend, down to retract
-                //double axial2 = -gamepad2.left_stick_y;  // Note: pushing stick forward gives negative value
+                double axial2 = -gamepad2.left_stick_y;  // Note: pushing stick forward gives negative value
 
                 //calculate arm power based on joystick from gamepad2
-                //double armPower = axial2/2;
+                double armPower = axial2/2;
+
+                /*
+                // Encoder mode
                 if (gamepad2.dpad_down) {
                     targetTicks = 0;
                 } else if (gamepad2.dpad_up) {
                     targetTicks = 3700;
                     //Depends where our goal position is for the arm - this will intel our final target tick amount
                 }
+                */
 
 
 
@@ -210,12 +217,26 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 boolean buttonBPressed = gamepad2.b;  // B gamepad 2
 
                 // Control claw movement through buttons
+                // TODO: find the right values by testing
                 if (buttonAPressed) { //open the claw
-                    position = 1.00;
+                    clawPosition = 1.00;
                 } else if (buttonBPressed) { //close the claw
-                    position = 0.70;
+                    clawPosition = 0.70;
                 }
 
+                //gamepad2 - control arm hinge - dpad_down pressed for lowering
+                boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
+
+                //gamepad2 - control claw intake - dpad_up pressed for raising
+                boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
+
+                // Control hinge movement through buttons
+                // TODO: find the right values by testing
+                if (dpadDownPressed) { //hinge up
+                    hingePosition = 1.00;
+                } else if (dpadUpPressed) { //hinge down
+                    hingePosition = 0.50;
+                }
 
 
                 // Normalize the values so no wheel power exceeds 100%
@@ -265,26 +286,29 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 rightBackDrive.setPower(rightBackPower);
 
                 // Send calculated power to telescoping arm
-                //armDrive.setPower(armPower);
+                armDrive.setPower(armPower);
 
-                encoderDrive(0.5, targetTicks, 2);
+                //encoderDrive(0.5, targetTicks, 2);
+
+                // Set the servo to the new position and pause;
+                clawServo.setPosition(clawPosition);
+
+                hingeServo.setPosition(hingePosition);
 
                 // Show the elapsed game time and wheel power.
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
                 telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
                 telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-                telemetry.addData("Arm", "%7d", targetTicks);
-                telemetry.update();
+                telemetry.addData("Arm", "%7d", armPower);
+                // telemetry.update();
 
                 // Display the current value
-                telemetry.addData("Servo Max", "%5.2f", MAX_POS);
-                telemetry.addData("Servo Min", "%5.2f", MIN_POS);
-                telemetry.addData("Servo Position", "%5.2f", position);
+                // telemetry.addData("Servo Max", "%5.2f", MAX_POS);
+                // telemetry.addData("Servo Min", "%5.2f", MIN_POS);
+                telemetry.addData("Claw Position", "%5.2f", clawPosition);
+                telemetry.addData("Hinge Position", "%5.2f", hingePosition);
                 telemetry.addData(">", "Press Stop to end test.");
                 telemetry.update();
-
-                // Set the servo to the new position and pause;
-                servo.setPosition(position);
 
                 sleep(CYCLE_MS);
                 idle();
@@ -302,7 +326,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
      *  2) Move runs out of time
      *  3) Driver stops the OpMode running.
      */
-    public void encoderDrive(double speed,
+    /*public void encoderDrive(double speed,
                              int targetTicks,
                              double timeoutS) {
         //if your already at the target do nothing
@@ -348,8 +372,10 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
             // Turn off RUN_TO_POSITION
             armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
+
         }
 
-    }}
+        */
+    }
 
 
