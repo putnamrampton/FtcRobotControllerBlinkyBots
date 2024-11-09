@@ -88,8 +88,8 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
     // Define class members
     Servo   clawServo;
     Servo   hingeServo;
-    double  clawPosition = .70;  //(MAX_POS - MIN_POS) / 2; // Start at halfway position
-    double  hingePosition = 0.70;
+    double  clawPosition = 0.50;  //guessing middle is 0.50
+    double  hingePosition = 0.10;
     //boolean rampUp = true;
 
 /*
@@ -219,9 +219,9 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 // Control claw movement through buttons
                 // TODO: find the right values by testing
                 if (buttonAPressed) { //open the claw
-                    clawPosition = 1.00;
+                    clawPosition = 0.50;
                 } else if (buttonBPressed) { //close the claw
-                    clawPosition = 0.70;
+                    clawPosition = 0.90;
                 }
 
                 //gamepad2 - control arm hinge - dpad_down pressed for lowering
@@ -232,10 +232,10 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
 
                 // Control hinge movement through buttons
                 // TODO: find the right values by testing
-                if (dpadDownPressed) { //hinge up
-                    hingePosition = 1.00;
-                } else if (dpadUpPressed) { //hinge down
-                    hingePosition = 0.50;
+                if (dpadDownPressed) { //hinge down
+                    hingePosition = 0.40;
+                } else if (dpadUpPressed) { //hinge up
+                    hingePosition = 0.10;
                 }
 
 
@@ -299,7 +299,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
                 telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
                 telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-                telemetry.addData("Arm", "%7d", armPower);
+                telemetry.addData("Arm", "%5.2f", armPower);
                 // telemetry.update();
 
                 // Display the current value
