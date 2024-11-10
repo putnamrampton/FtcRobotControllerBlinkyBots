@@ -35,6 +35,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /*
@@ -87,9 +88,11 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
 
     // Define class members
     Servo   clawServo;
-    Servo   hingeServo;
+    // Servo   hingeServo; // Standard servo
+    CRServo   hingeServo; // Continuous servo
     double  clawPosition = 0.50;  //guessing middle is 0.50
-    double  hingePosition = 0.10;
+    // double  hingePosition = 0.10; // Standard servo
+    double hingePower = 0; // Continuous servo.  0.5 is off.  0.0 and 1.0 are the min and max.
     //boolean rampUp = true;
 
 /*
@@ -131,7 +134,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
         clawServo = hardwareMap.get(Servo.class, "claw_hand");
 
         // Connect to servo
-        hingeServo = hardwareMap.get(Servo.class, "arm_hinge");
+        hingeServo = hardwareMap.get(CRServo.class, "arm_hinge");
 
         // Send telemetry message to indicate successful Encoder reset
         //telemetry.addData("Arm location starting at",  "%7d",
@@ -192,23 +195,43 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 double leftBackPower = axial - lateral + yaw;
                 double rightBackPower = axial + lateral - yaw;
 
-                //gamepad2 - control the arms - left joystick up to extend, down to retract
-                double axial2 = -gamepad2.left_stick_y;  // Note: pushing stick forward gives negative value
+                //gamepad2 - control the arms - right joystick up to extend, down to retract
+                double axial2 = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
 
                 //calculate arm power based on joystick from gamepad2
-                double armPower = axial2/2;
+                double armPower = axial2 * 0.65;
+                //Overiding armPower to keep the telescoping arm from falling
+                if (armPower == 0) {
+                    armPower = 0.05;
+                }
+
+
+
+                //gamepad2 - control arm hinge - dpad_down pressed for lowering
+                boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
+
+                //gamepad2 - control claw intake - dpad_up pressed for raising
+                boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
+
+                // Control hinge movement through buttons
+                // TODO: find the right values by testing
+                if (dpadDownPressed) { //hinge down
+                    hingePower = -1.0;
+                } else if (dpadUpPressed) { //hinge up
+                    hingePower = 1.0;
+                } else {
+                    hingePower = 0.04;
+                }
 
                 /*
-                // Encoder mode
-                if (gamepad2.dpad_down) {
-                    targetTicks = 0;
-                } else if (gamepad2.dpad_up) {
-                    targetTicks = 3700;
-                    //Depends where our goal position is for the arm - this will intel our final target tick amount
+                // Control hinge movement through buttons
+                // TODO: find the right values by testing
+                if (dpadDownPressed) { //hinge down
+                    hingePosition = 0.40;
+                } else if (dpadUpPressed) { //hinge up
+                    hingePosition = 0.10;
                 }
                 */
-
-
 
                 //gamepad2 - control claw intake - a pressed for open
                 boolean buttonAPressed = gamepad2.a;  // A gamepad 2
@@ -224,19 +247,15 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                     clawPosition = 0.90;
                 }
 
-                //gamepad2 - control arm hinge - dpad_down pressed for lowering
-                boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
-
-                //gamepad2 - control claw intake - dpad_up pressed for raising
-                boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
-
-                // Control hinge movement through buttons
-                // TODO: find the right values by testing
-                if (dpadDownPressed) { //hinge down
-                    hingePosition = 0.40;
-                } else if (dpadUpPressed) { //hinge up
-                    hingePosition = 0.10;
+                /*
+                Encoder mode
+                if (gamepad2.dpad_down) {
+                targetTicks = 0;
+                 } else if (gamepad2.dpad_up) {
+                     targetTicks = 3700; //Depends where our goal position is for the arm - this will intel our final target tick amount
                 }
+                */
+
 
 
                 // Normalize the values so no wheel power exceeds 100%
@@ -293,7 +312,9 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 // Set the servo to the new position and pause;
                 clawServo.setPosition(clawPosition);
 
-                hingeServo.setPosition(hingePosition);
+                //hingeServo.setPosition(hingePosition); // Standard servo
+
+                hingeServo.setPower(hingePower); // Continuous servo
 
                 // Show the elapsed game time and wheel power.
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
@@ -306,7 +327,8 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
                 // telemetry.addData("Servo Max", "%5.2f", MAX_POS);
                 // telemetry.addData("Servo Min", "%5.2f", MIN_POS);
                 telemetry.addData("Claw Position", "%5.2f", clawPosition);
-                telemetry.addData("Hinge Position", "%5.2f", hingePosition);
+                //telemetry.addData("Hinge Position", "%5.2f", hingePosition); // Standard servo
+                telemetry.addData("Hinge Power", "%4.2f", hingePower);
                 telemetry.addData(">", "Press Stop to end test.");
                 telemetry.update();
 
