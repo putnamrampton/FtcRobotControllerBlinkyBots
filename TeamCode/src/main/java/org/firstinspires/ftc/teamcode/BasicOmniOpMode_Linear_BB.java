@@ -351,7 +351,7 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
     /*public void encoderDrive(double speed,
                              int targetTicks,
                              double timeoutS) {
-        //if your already at the target do nothing
+        // if you're already at the target do nothing
         if (armDrive.getCurrentPosition() == targetTicks) {
             return;
         }

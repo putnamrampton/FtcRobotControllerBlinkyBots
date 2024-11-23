@@ -30,9 +30,9 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /*
@@ -54,8 +54,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Strafe Right", group="Robot")
-public class RobotAutoDriveByTime_Right extends LinearOpMode {
+@Autonomous(name="Specimen Hang", group="Robot")
+public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
 
     /* Declare OpMode members. */
     private DcMotor leftFrontDrive = null;
@@ -63,16 +63,16 @@ public class RobotAutoDriveByTime_Right extends LinearOpMode {
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
 
-    private ElapsedTime     runtime = new ElapsedTime();
+    //telescoping arm
+    private DcMotor armDrive = null;
 
+    private ElapsedTime     runtime = new ElapsedTime();
 
     static final double     FORWARD_SPEED = 0.6;
     static final double     TURN_SPEED    = 0.5;
 
     @Override
     public void runOpMode() {
-
-        sleep(25000); //Sleeping for 25 secs to stay out of the way for more advanced teams auto drive
 
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
@@ -89,17 +89,120 @@ public class RobotAutoDriveByTime_Right extends LinearOpMode {
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
 
+        //add config for new motor (telescoping arm)
+        armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
+        armDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        armDrive.setTargetPosition(0);
+        armDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        armDrive.setZeroPowerBehavior(ZeroPowerBehavior.BRAKE);
+        // Set direction for the telescoping arm
+        armDrive.setDirection(DcMotor.Direction.REVERSE);
+
         // Send telemetry message to signify robot waiting;
-        telemetry.addData("Status", "Ready to run");    //
+        telemetry.addData("Status", "Ready to run");
+        // Send telemetry message to indicate successful Encoder reset
+        telemetry.addData("Arm location starting at",  "%7d",
+            armDrive.getCurrentPosition());
         telemetry.update();
 
         // Wait for the game to start (driver presses START)
         waitForStart();
 
-        // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
-        double axial = 0;  // Note: pushing stick forward gives negative value
-        double lateral = 0.3; //1 = right
-        double yaw = 0;
+        int targetTicks = 0;
+
+        // Step through each leg of the path, ensuring that the OpMode has not been stopped along the way.
+
+        //calculate arm power based on joystick from gamepad2
+        double armPower = 0.65;
+
+        // Declare new target value for specimen hanging height
+        int hangingSpecimenTicks = 1500; //TODO: test value
+
+        // Declare new target value for arm bottom height
+        int armDownTicks = 0;
+
+        // Step 1: Lift arm
+        encoderArm(armPower, hangingSpecimenTicks, 3);
+
+        // Step 2: Drive forward for x amount of time and stop
+        encoderDrive(0.5, 0, 0, 2);
+
+        // Step 3: Pull arm down
+        encoderArm(armPower, armDownTicks, 1);
+
+        // Step 4: Strafe back & right to observation zone
+        encoderDrive(-0.2, 0.6, 0, 2);
+
+        // Step 5: Park & wait for teleOp
+
+        telemetry.addData("Path", "Complete");
+        telemetry.update();
+        sleep(1000);
+    }
+
+/*
+ *  Method to perform a move to an exact position, based on encoder counts.
+ *  Move will stop if any of three conditions occur:
+ *  1) Move gets to the desired position
+ *  2) Move runs out of time
+ *  3) Driver stops the OpMode running.
+ */
+    public void encoderArm(double speed,
+                             int targetTicks,
+                             double timeoutS) {
+        // if you're already at the target do nothing
+        if (armDrive.getCurrentPosition() == targetTicks) {
+            return;
+        }
+        // Ensure that the OpMode is still active
+        if (opModeIsActive()) {
+
+            armDrive.setTargetPosition(targetTicks);
+
+            // reset the timeout time and start motion.
+            runtime.reset();
+            armDrive.setPower(Math.abs(speed));
+
+            //TODO: figure out how to include the while (opModeISActive() loop in code above
+            //the encoder resolution is 537.7 PPR, this is for a 19.2:1 gear ratio
+            //initial guess for fully extending the slide: about 15,000 - WAY TO MUCH
+
+            // keep looping while we are still active, and there is time left, and both motors are running.
+            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
+            // its target position, the motion will stop.  This is "safer" in the event that the robot will
+            // always end the motion as soon as possible.
+            // However, if you require that BOTH motors have finished their moves before the robot continues
+            // onto the next step, use (isBusy() || isBusy()) in the loop test.
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    armDrive.isBusy()) {
+
+                // Display it for the driver.
+                telemetry.addData("Running telescoping arm to", " %7d", targetTicks);
+                telemetry.addData("Currently at", " at %7d",
+                        armDrive.getCurrentPosition());
+                telemetry.update();
+            }
+
+            // Stop all motion;
+            armDrive.setPower(0.05); // to prevent drift... ZeroPowerBehavior.BRAKE doesn't work
+
+        }
+    }
+
+    /*
+     *  Method to perform a move to an exact position, based on encoder counts.
+     *  Move will stop if any of three conditions occur:
+     *  1) Move gets to the desired position
+     *  2) Move runs out of time
+     *  3) Driver stops the OpMode running.
+     *
+     *  TODO: Rename this. Driving wheels by time, not encoder.
+     */
+    public void encoderDrive(double axial,
+                             double lateral,
+                             double yaw,
+                             double timeout) {
 
         // Combine the joystick requests for each axis-motion to determine each wheel's power.
         // Set up a variable for each drive wheel to save the power level for telemetry.
@@ -121,32 +224,23 @@ public class RobotAutoDriveByTime_Right extends LinearOpMode {
             leftBackPower /= max;
             rightBackPower /= max;
         }
-        // Step through each leg of the path, ensuring that the OpMode has not been stopped along the way.
 
-        // Step 1:  Drive forward for 3 seconds
-        // Send calculated power to wheels
+        // Send calculated power to wheels to go
         leftFrontDrive.setPower(leftFrontPower);
         rightFrontDrive.setPower(rightFrontPower);
         leftBackDrive.setPower(leftBackPower);
         rightBackDrive.setPower(rightBackPower);
 
         runtime.reset();
-        while (opModeIsActive() && (runtime.seconds() < 3.0)) {
+        while (opModeIsActive() && (runtime.seconds() < timeout)) {
             telemetry.addData("Path", "Leg 1: %4.1f S Elapsed", runtime.seconds());
             telemetry.update();
         }
 
-
-        // Step 4:  Stop
-        // Send calculated power to wheels
+        // Send calculated power to wheels to stop
         leftFrontDrive.setPower(0);
         rightFrontDrive.setPower(0);
         leftBackDrive.setPower(0);
         rightBackDrive.setPower(0);
-
-
-        telemetry.addData("Path", "Complete");
-        telemetry.update();
-        sleep(1000);
     }
 }

@@ -30,6 +30,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -54,6 +55,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  */
 
 @Autonomous(name="Strafe Left", group="Robot")
+@Disabled
 public class RobotAutoDriveByTime_Left extends LinearOpMode {
 
     /* Declare OpMode members. */
@@ -97,7 +99,7 @@ public class RobotAutoDriveByTime_Left extends LinearOpMode {
 
         // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
         double axial = 0;  // Note: pushing stick forward gives negative value
-        double lateral = -0.7; //-1 = left
+        double lateral = -0.6; //-1 = left
         double yaw = 0;
 
         // Combine the joystick requests for each axis-motion to determine each wheel's power.
