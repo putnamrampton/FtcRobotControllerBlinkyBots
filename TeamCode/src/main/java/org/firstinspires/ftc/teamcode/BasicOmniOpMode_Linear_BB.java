@@ -241,9 +241,9 @@ public class BasicOmniOpMode_Linear_BB extends LinearOpMode {
 
                 // Control claw movement through buttons
                 // TODO: find the right values by testing
-                if (buttonAPressed) { //open the claw
+                if (buttonAPressed) { //close the claw
                     clawPosition = 0.50;
-                } else if (buttonBPressed) { //close the claw
+                } else if (buttonBPressed) { //open the claw
                     clawPosition = 0.90;
                 }
 

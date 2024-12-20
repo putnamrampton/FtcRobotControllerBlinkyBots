@@ -33,6 +33,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /*
@@ -66,6 +67,18 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
     //telescoping arm
     private DcMotor armDrive = null;
 
+    //servo claw
+    static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
+    static final int    CYCLE_MS    =   50;     // period of each cycle
+    static final double MAX_POS     =  1.0;     // Maximum rotational position
+    static final double MIN_POS     =  0.0;     // Minimum rotational position
+
+    // Define class members
+    Servo clawServo;
+
+    double  clawPosition = 0.50;  //guessing middle is 0.50
+    // double  hingePosition = 0.10; // Standard servo
+
     private ElapsedTime     runtime = new ElapsedTime();
 
     static final double     FORWARD_SPEED = 0.6;
@@ -98,12 +111,17 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         // Set direction for the telescoping arm
         armDrive.setDirection(DcMotor.Direction.REVERSE);
 
+        // Connect to servo (Assume Robot Left Hand)
+        // Change the text in quotes to match any servo name on your robot.
+        clawServo = hardwareMap.get(Servo.class, "claw_hand");
+
         // Send telemetry message to signify robot waiting;
         telemetry.addData("Status", "Ready to run");
         // Send telemetry message to indicate successful Encoder reset
         telemetry.addData("Arm location starting at",  "%7d",
             armDrive.getCurrentPosition());
         telemetry.update();
+
 
         // Wait for the game to start (driver presses START)
         waitForStart();
@@ -116,24 +134,28 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         double armPower = 0.65;
 
         // Declare new target value for specimen hanging height
-        int hangingSpecimenTicks = 1500; //TODO: test value
+        int hangingSpecimenTicks = 1400; //TODO: test value
 
         // Declare new target value for arm bottom height
         int armDownTicks = 0;
 
-        // Step 1: Lift arm
+        // Step 1: Close claw
+        clawPosition = 0.50;
+        clawServo.setPosition(clawPosition);
+
+        // Step 2: Lift arm
         encoderArm(armPower, hangingSpecimenTicks, 3);
 
-        // Step 2: Drive forward for x amount of time and stop
+        // Step 3: Drive forward for x amount of time and stop
         encoderDrive(0.5, 0, 0, 2);
 
-        // Step 3: Pull arm down
+        // Step 4: Pull arm down
         encoderArm(armPower, armDownTicks, 1);
 
-        // Step 4: Strafe back & right to observation zone
+        // Step 5: Strafe back & right to observation zone
         encoderDrive(-0.2, 0.6, 0, 2);
 
-        // Step 5: Park & wait for teleOp
+        // Step 6: Park & wait for teleOp
 
         telemetry.addData("Path", "Complete");
         telemetry.update();
