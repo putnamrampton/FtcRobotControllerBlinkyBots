@@ -29,12 +29,18 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 /*
  * This OpMode illustrates the concept of driving a path based on time.
@@ -43,11 +49,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * The code assumes that you do NOT have encoders on the wheels,
  *   otherwise you would use: RobotAutoDriveByEncoder;
  *
- *   The desired path in this example is:
- *   - Drive forward for 3 seconds
- *   - Spin right for 1.3 seconds
- *   - Drive Backward for 1 Second
- *
  *  The code is written in a simple form with no optimizations.
  *  However, there are several ways that this type of sequence could be streamlined,
  *
@@ -55,8 +56,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Specimen Hang", group="Robot")
-public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
+@Autonomous(name="Double Specimen Hang", group="Robot")
+public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     /* Declare OpMode members. */
     private DcMotor leftFrontDrive = null;
@@ -67,22 +68,48 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
     //telescoping arm
     private DcMotor armDrive = null;
 
-    //servo claw
+    /*
+    servo claw
+
     static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
     static final int    CYCLE_MS    =   50;     // period of each cycle
     static final double MAX_POS     =  1.0;     // Maximum rotational position
     static final double MIN_POS     =  0.0;     // Minimum rotational position
+    */
 
     // Define class members
     Servo clawServo;
+    Servo hingeServo;
 
     double  clawPosition = 0.50;  //guessing middle is 0.50
-    // double  hingePosition = 0.10; // Standard servo
+    double  hingePosition = 0.0; // Standard servo TODO: Find right values through testing (value should be up)
 
-    private ElapsedTime     runtime = new ElapsedTime();
+    private IMU imu         = null;      // Control/Expansion Hub IMU
 
-    static final double     FORWARD_SPEED = 0.6;
-    static final double     TURN_SPEED    = 0.5;
+    // These variable are declared here (as class members) so they can be updated in various methods,
+    // but still be displayed by sendTelemetry()
+    private double  targetHeading = 0;
+    private double  turnSpeed     = 0;
+
+    private double          headingError  = 0;
+
+    // These constants define the desired driving/control characteristics
+    // They can/should be tweaked to suit the specific robot drive train.
+    static final double     TURN_SPEED              = 0.8;     // Max turn speed to limit turn rate.
+    static final double     HEADING_THRESHOLD       = 0.5 ;    // How close must the heading get to the target before moving to next step.
+    // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
+
+    // Define the Proportional control coefficient (or GAIN) for "heading control".
+    // We define one value when Turning (larger errors), and the other is used when Driving straight (smaller errors).
+    // Increase these numbers if the heading does not correct strongly enough (eg: a heavy robot or using tracks)
+    // Decrease these numbers if the heading does not settle on the correct value (eg: very agile robot with omni wheels)
+    static final double     P_TURN_GAIN            = 0.5;     // Larger is more responsive, but also less stable.
+    static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable.
+
+    private final ElapsedTime     runtime = new ElapsedTime();
+
+    // static final double     FORWARD_SPEED = 0.6;
+    // static final double     TURN_SPEED    = 0.5;
 
     @Override
     public void runOpMode() {
@@ -111,9 +138,33 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         // Set direction for the telescoping arm
         armDrive.setDirection(DcMotor.Direction.REVERSE);
 
-        // Connect to servo (Assume Robot Left Hand)
-        // Change the text in quotes to match any servo name on your robot.
+        /* The next two lines define Hub orientation.
+         * The Default Orientation (shown) is when a hub is mounted horizontally with the printed logo pointing UP and the USB port pointing FORWARD.
+         *
+         * TODO:  EDIT these two lines to match YOUR mounting configuration.
+         */
+        RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
+        RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.RIGHT;
+        RevHubOrientationOnRobot orientationOnRobot = new RevHubOrientationOnRobot(logoDirection, usbDirection);
+
+        // Now initialize the IMU with this mounting orientation
+        // This sample expects the IMU to be in a REV Hub and named "imu".
+        imu = hardwareMap.get(IMU.class, "imu");
+        imu.initialize(new IMU.Parameters(orientationOnRobot));
+
+        // Connect to servo
         clawServo = hardwareMap.get(Servo.class, "claw_hand");
+
+        // Connect to servo
+        hingeServo = hardwareMap.get(Servo.class, "arm_hinge");
+
+        // Wait for the game to start (Display Gyro value while waiting)
+        while (opModeInInit()) {
+            telemetry.addData(">", "Robot Heading = %4.0f", getHeading());
+            telemetry.update();
+        }
+
+        imu.resetYaw();
 
         // Send telemetry message to signify robot waiting;
         telemetry.addData("Status", "Ready to run");
@@ -126,18 +177,23 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         // Wait for the game to start (driver presses START)
         waitForStart();
 
-        int targetTicks = 0;
+        //int targetTicks = 0;
 
         // Step through each leg of the path, ensuring that the OpMode has not been stopped along the way.
+        //          holdHeading() is used after turns to let the heading stabilize
+        //          Add a sleep(2000) after any step to keep the telemetry data visible for review
 
         //calculate arm power based on joystick from gamepad2
-        double armPower = 0.85;
+        double armPower = 0.65;
 
         // Declare new target value for specimen hanging height
-        int hangingSpecimenTicks = 3100; //TODO: test value
+        int hangingSpecimenTicks = 1400; //TODO: test value
 
         // Declare new target value for arm bottom height
         int armDownTicks = 0;
+
+        // Declare new target value for specimen lift-off height
+        int specimenLiftTicks = 50; //TODO: test value
 
         // Step 1: Close claw
         clawPosition = 0.50;
@@ -147,24 +203,74 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         encoderArm(armPower, hangingSpecimenTicks, 3);
 
         // Step 3: Drive forward for x amount of time and stop
-        encoderDrive(0.4, 0, 0, 2);
+        driveByTime(0.5, 0, 0, 2);
 
         // Step 4: Pull arm down
         encoderArm(armPower, armDownTicks, 1);
 
-        // Step 5: Open claw
-        sleep(500);
+        // Step: Open claw
         clawPosition = 0.90;
         clawServo.setPosition(clawPosition);
 
-        // Step 5: Strafe back & right to observation zone
-        encoderDrive(-0.2, 0.6, 0, 2);
+        // Step: Strafe back halfway
+        driveByTime(-0.5,0,0,0.7);
 
-        // Step 6: Park & wait for teleOp
+        // Step: Rotate 90 degrees clockwise
+        turnToHeading( TURN_SPEED, -90.0);
+
+        // Step: Lower arm hinge to specimen pick - up height
+        hingePosition = 0.17;                       // TODO: Change values through testing
+        hingeServo.setPosition(hingePosition);
+
+        // Step: Drive forward TODO: drive with april tags
+        driveByTime(0.6,0 , 0, 1.8);
+
+        // Step: Rotate an additional 90 degrees clockwise
+        turnToHeading( TURN_SPEED, -180.0);
+
+        // Step: Drive forward into observation zone
+        driveByTime(0.4,0,0,0.5); // TODO: Change values through testing
+
+        // Step: Close claw
+        clawPosition = 0.50;
+        clawServo.setPosition(clawPosition);
+
+        // Step: Lift arm slightly to disengage from wall
+        encoderArm(armPower, specimenLiftTicks, 1);
+
+        // Step: Raise arm hinge
+        hingePosition = 1.0;                       // TODO: Change values through testing
+        hingeServo.setPosition(hingePosition);
+
+        // Step: Back up
+        driveByTime(-0.4,0,0,0.5); // TODO: Change values through testing
+
+        // Step: Rotate 90 degrees CW
+        turnToHeading( TURN_SPEED, 90);
+
+        // Step: drive forwards back to submersible
+        driveByTime(0.6,0 , 0, 1.55);
+
+        // Step: Raise arm
+        encoderArm(armPower, hangingSpecimenTicks, 3);
+
+        // Step: Rotate 90 degrees CW
+        turnToHeading( TURN_SPEED, 0);
+
+        // Step: Drive forwards
+        driveByTime(0.5,0,0,0.7);
+
+        // Step: Pull arm down
+        encoderArm(armPower, armDownTicks, 1);
+
+        // Step: Strafe back and to the right to observation zone
+        driveByTime(-0.2, 0.6, 0, 2);
+
+        // Step: Park and wait for TeleOp
 
         telemetry.addData("Path", "Complete");
         telemetry.update();
-        sleep(1000);
+        sleep(1000); //TODO: Change value w/ testing
     }
 
 /*
@@ -226,7 +332,7 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
      *
      *  TODO: Rename this. Driving wheels by time, not encoder.
      */
-    public void encoderDrive(double axial,
+    public void driveByTime(double axial,
                              double lateral,
                              double yaw,
                              double timeout) {
@@ -269,5 +375,91 @@ public class RobotAutoDriveByTime_Specimen extends LinearOpMode {
         rightFrontDrive.setPower(0);
         leftBackDrive.setPower(0);
         rightBackDrive.setPower(0);
+    }
+
+    public void turnToHeading(double maxTurnSpeed, double heading) {
+
+        // Run getSteeringCorrection() once to pre-calculate the current error
+        getSteeringCorrection(heading, P_DRIVE_GAIN); // TODO: check your args
+
+        // keep looping while we are still active, and not on heading.
+        while (opModeIsActive() && (Math.abs(headingError) > HEADING_THRESHOLD)) {
+
+            // Determine required steering to keep on heading
+            turnSpeed = getSteeringCorrection(heading, P_TURN_GAIN);
+
+            // Clip the speed to the maximum permitted value.
+            turnSpeed = Range.clip(turnSpeed, -maxTurnSpeed, maxTurnSpeed);
+
+            // Pivot in place by applying the turning correction
+            // Combine the joystick requests for each axis-motion to determine each wheel's power.
+            // Set up a variable for each drive wheel to save the power level for telemetry.
+            double leftFrontPower = -1 * turnSpeed;
+            double rightFrontPower = turnSpeed;
+            double leftBackPower = -1 * turnSpeed;
+            double rightBackPower = turnSpeed;
+
+            // Normalize the values so no wheel power exceeds 100%
+            // This ensures that the robot maintains the desired motion.
+            double max;
+            max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+            max = Math.max(max, Math.abs(leftBackPower));
+            max = Math.max(max, Math.abs(rightBackPower));
+
+            if (max > 1.0) {
+                leftFrontPower /= max;
+                rightFrontPower /= max;
+                leftBackPower /= max;
+                rightBackPower /= max;
+            }
+
+            // Send calculated power to wheels to go
+            leftFrontDrive.setPower(leftFrontPower);
+            rightFrontDrive.setPower(rightFrontPower);
+            leftBackDrive.setPower(leftBackPower);
+            rightBackDrive.setPower(rightBackPower);
+
+
+            // Display drive status for the driver.
+            sendTelemetry(false);
+        }
+
+        // Stop all motion;
+        leftFrontDrive.setPower(0);
+        rightFrontDrive.setPower(0);
+        leftBackDrive.setPower(0);
+        rightBackDrive.setPower(0);
+    }
+
+
+    public double getSteeringCorrection(double desiredHeading, double proportionalGain) {
+        targetHeading = desiredHeading;  // Save for telemetry
+
+        // Determine the heading current error
+        headingError = targetHeading - getHeading();
+
+        // Normalize the error to be within +/- 180 degrees
+        while (headingError > 180)  headingError -= 360;
+        while (headingError <= -180) headingError += 360;
+
+        // Multiply the error by the gain to determine the required steering correction/  Limit the result to +/- 1.0
+        return Range.clip(headingError * proportionalGain, -1, 1);
+    }
+    public double getHeading() {
+        YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
+        return orientation.getYaw(AngleUnit.DEGREES);
+    }
+    private void sendTelemetry(boolean straight) {
+
+        if (straight) {
+            telemetry.addData("Motion", "Drive Straight");
+        } else {
+            telemetry.addData("Motion", "Turning");
+        }
+
+        telemetry.addData("Heading- Target : Current", "%5.2f : %5.0f", targetHeading, getHeading());
+        telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
+        telemetry.addData("Threshold :",  "%5.1f", HEADING_THRESHOLD);
+        telemetry.update();
     }
 }
