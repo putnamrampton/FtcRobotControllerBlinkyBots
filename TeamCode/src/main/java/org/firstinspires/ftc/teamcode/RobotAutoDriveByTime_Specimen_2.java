@@ -39,8 +39,18 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /*
  * This OpMode illustrates the concept of driving a path based on time.
@@ -81,8 +91,34 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     Servo clawServo;
     Servo hingeServo;
 
+    // TODO define static constants for arm up, mid, down positions.
+
     double  clawPosition = 0.50;  //guessing middle is 0.50
     double  hingePosition = 0.0; // Standard servo TODO: Find right values through testing (value should be up)
+
+    // Adjust these numbers to suit your robot.
+    // final double DESIRED_DISTANCE = 12.0; //  this is how close the camera should get to the target (inches)
+
+    //  * Setup for drive by April Tag
+
+    //  Set the GAIN constants to control the relationship between the measured position error, and how much power is
+    //  applied to the drive motors to correct the error.
+    //  Drive = Error * Gain    Make these values smaller for smoother control, or larger for a more aggressive response.
+    final double SPEED_GAIN  =  0.02  ;   //  Forward Speed Control "Gain". e.g. Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0)
+    final double STRAFE_GAIN =  0.015 ;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
+    final double TURN_GAIN   =  0.01  ;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
+
+    final double MAX_AUTO_SPEED = 0.5;   //  Clip the approach speed to this max value (adjust for your robot)
+    final double MAX_AUTO_STRAFE= 0.5;   //  Clip the strafing speed to this max value (adjust for your robot)
+    final double MAX_AUTO_TURN  = 0.3;   //  Clip the turn speed to this max value (adjust for your robot)
+
+    final double APRIL_DISTANCE_THRESHOLD = 0.5;    // Current distance from april tag is under this threshold distance from desired distance.
+
+    private static final boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
+    private static final int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
+    private VisionPortal visionPortal;               // Used to manage the video source.
+    private AprilTagProcessor aprilTag;              // Used for managing the AprilTag detection process.
+    private AprilTagDetection desiredTag = null;     // Used to hold the data for a detected AprilTag
 
     private IMU imu         = null;      // Control/Expansion Hub IMU
 
@@ -91,6 +127,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     private double  targetHeading = 0;
     private double  turnSpeed     = 0;
 
+    // * Setup for turn by Gyro
     private double          headingError  = 0;
 
     // These constants define the desired driving/control characteristics
@@ -106,6 +143,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     static final double     P_TURN_GAIN            = 0.5;     // Larger is more responsive, but also less stable.
     static final double     P_DRIVE_GAIN           = 0.03;     // Larger is more responsive, but also less stable.
 
+    // * Setup for Drive by Time
     private final ElapsedTime     runtime = new ElapsedTime();
 
     // static final double     FORWARD_SPEED = 0.6;
@@ -113,6 +151,10 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+
+        // Initialize the Apriltag Detection process
+        initAprilTag();
+
 
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
@@ -140,8 +182,6 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
         /* The next two lines define Hub orientation.
          * The Default Orientation (shown) is when a hub is mounted horizontally with the printed logo pointing UP and the USB port pointing FORWARD.
-         *
-         * TODO:  EDIT these two lines to match YOUR mounting configuration.
          */
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
         RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.RIGHT;
@@ -173,6 +213,13 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
             armDrive.getCurrentPosition());
         telemetry.update();
 
+        if (USE_WEBCAM)
+            setManualExposure(6, 250);  // Use low exposure time to reduce motion blur
+
+        // Wait for driver to press start
+        telemetry.addData("Camera preview on/off", "3 dots, Camera Stream");
+        telemetry.addData(">", "Touch START to start OpMode");
+        telemetry.update();
 
         // Wait for the game to start (driver presses START)
         waitForStart();
@@ -223,7 +270,8 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         hingeServo.setPosition(hingePosition);
 
         // Step: Drive forward TODO: drive with april tags
-        driveByTime(0.6,0 , 0, 1.8);
+        driveToAprilTag(12);
+        //driveByTime(0.6,0 , 0, 1.8);
 
         // Step: Rotate an additional 90 degrees clockwise
         turnToHeading( TURN_SPEED, -180.0);
@@ -245,11 +293,12 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         // Step: Back up
         driveByTime(-0.4,0,0,0.5); // TODO: Change values through testing
 
-        // Step: Rotate 90 degrees CW
-        turnToHeading( TURN_SPEED, 90);
+        // Step: Rotate 90 degrees CCW
+        turnToHeading( TURN_SPEED, -90);
 
-        // Step: drive forwards back to submersible
-        driveByTime(0.6,0 , 0, 1.55);
+        // Step: drive backwards back to submersible
+        driveToAprilTag(48);
+        //driveByTime(0.6,0 , 0, 1.55);
 
         // Step: Raise arm
         encoderArm(armPower, hangingSpecimenTicks, 3);
@@ -330,7 +379,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
      *  2) Move runs out of time
      *  3) Driver stops the OpMode running.
      *
-     *  TODO: Rename this. Driving wheels by time, not encoder.
+     *  TODO: Make a new copy of this that takes both timeout and encoder ticks.
      */
     public void driveByTime(double axial,
                              double lateral,
@@ -380,7 +429,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     public void turnToHeading(double maxTurnSpeed, double heading) {
 
         // Run getSteeringCorrection() once to pre-calculate the current error
-        getSteeringCorrection(heading, P_DRIVE_GAIN); // TODO: check your args
+        getSteeringCorrection(heading, P_DRIVE_GAIN);
 
         // keep looping while we are still active, and not on heading.
         while (opModeIsActive() && (Math.abs(headingError) > HEADING_THRESHOLD)) {
@@ -433,17 +482,26 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
 
     public double getSteeringCorrection(double desiredHeading, double proportionalGain) {
+        double steeringCorrection = 0;
+
         targetHeading = desiredHeading;  // Save for telemetry
 
         // Determine the heading current error
         headingError = targetHeading - getHeading();
 
         // Normalize the error to be within +/- 180 degrees
-        while (headingError > 180)  headingError -= 360;
+        while (headingError > 180) headingError -= 360;
         while (headingError <= -180) headingError += 360;
 
         // Multiply the error by the gain to determine the required steering correction/  Limit the result to +/- 1.0
-        return Range.clip(headingError * proportionalGain, -1, 1);
+        // Adjust gain according to severity of error.  When error is low, turn slower.
+        if (headingError > 20) {
+            steeringCorrection = Range.clip(headingError * proportionalGain, -1, 1);
+        } else {
+            steeringCorrection = Range.clip(headingError * proportionalGain * 0.5, -1, 1);
+        }
+
+        return steeringCorrection;
     }
     public double getHeading() {
         YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
@@ -461,5 +519,163 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         telemetry.addData("Error  : Steer Pwr",  "%5.1f : %5.1f", headingError, turnSpeed);
         telemetry.addData("Threshold :",  "%5.1f", HEADING_THRESHOLD);
         telemetry.update();
+    }
+    public void driveToAprilTag(double desiredDistance) {
+
+        boolean targetFound     = false;    // Set to true when an AprilTag target is detected
+        double  drive           = 0;        // Desired forward power/speed (-1 to +1)
+        double  strafe          = 0;        // Desired strafe power/speed (-1 to +1)
+        double  turn            = 0;        // Desired turning power/speed (-1 to +1)
+
+        desiredTag  = null;
+
+        // Step through the list of detected tags and look for a matching tag
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+        for (AprilTagDetection detection : currentDetections) {
+            // Look to see if we have size info on this tag.
+            if (detection.metadata != null) {
+                //  Check to see if we want to track towards this tag.
+                if ((DESIRED_TAG_ID < 0) || (detection.id == DESIRED_TAG_ID)) {
+                    // Yes, we want to use this tag.
+                    targetFound = true;
+                    desiredTag = detection;
+                    break;  // don't look any further.
+                } else {
+                    // This tag is in the library, but we do not want to track it right now.
+                    telemetry.addData("Skipping", "Tag ID %d is not desired", detection.id);
+                }
+            } else {
+                // This tag is NOT in the library, so we don't have enough information to track to it.
+                telemetry.addData("Unknown", "Tag ID %d is not in TagLibrary", detection.id);
+            }
+        }
+
+        // Tell the driver what we see, and what to do.
+        if (targetFound) {
+            telemetry.addData("Found", "ID %d (%s)", desiredTag.id, desiredTag.metadata.name);
+            telemetry.addData("Range",  "%5.1f inches", desiredTag.ftcPose.range);
+            telemetry.addData("Bearing","%3.0f degrees", desiredTag.ftcPose.bearing);
+            telemetry.addData("Yaw","%3.0f degrees", desiredTag.ftcPose.yaw);
+
+            // TODO: Wrap this in a while loop.  Keep looping while
+            // absolute value of (distance from april tag - desiredDistance) is more than 0.5 inch.
+            while (opModeIsActive() &&
+                    (Math.abs(desiredTag.ftcPose.range - desiredDistance) > APRIL_DISTANCE_THRESHOLD)) {
+
+                // Determine heading, range and Yaw (tag image rotation) error so we can use them to control the robot automatically.
+                double rangeError = (desiredTag.ftcPose.range - desiredDistance);
+                double headingError = desiredTag.ftcPose.bearing;
+                double yawError = desiredTag.ftcPose.yaw;
+
+                // Use the speed and turn "gains" to calculate how we want the robot to move.
+                drive = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED);
+                turn = Range.clip(headingError * TURN_GAIN, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+                strafe = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE);
+
+                telemetry.addData("Auto", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
+                telemetry.update();
+
+                // Apply desired axes motions to the drivetrain.
+                moveRobot(drive, strafe, turn);
+                sleep(10);
+            }
+
+        } else {
+            // Error case. Could not find an April Tag.
+            telemetry.addData("\n>","NO TARGET FOUND\n");
+            telemetry.update();
+
+            sleep(2000)
+        }
+    }
+
+    public void moveRobot(double x, double y, double yaw) {
+        // Calculate wheel powers.
+        double leftFrontPower    =  x -y -yaw;
+        double rightFrontPower   =  x +y +yaw;
+        double leftBackPower     =  x +y -yaw;
+        double rightBackPower    =  x -y +yaw;
+
+        // Normalize wheel powers to be less than 1.0
+        double max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+        max = Math.max(max, Math.abs(leftBackPower));
+        max = Math.max(max, Math.abs(rightBackPower));
+
+        if (max > 1.0) {
+            leftFrontPower /= max;
+            rightFrontPower /= max;
+            leftBackPower /= max;
+            rightBackPower /= max;
+        }
+
+        // Send powers to the wheels.
+        leftFrontDrive.setPower(leftFrontPower);
+        rightFrontDrive.setPower(rightFrontPower);
+        leftBackDrive.setPower(leftBackPower);
+        rightBackDrive.setPower(rightBackPower);
+    }
+    private void initAprilTag() {
+        // Create the AprilTag processor by using a builder.
+        aprilTag = new AprilTagProcessor.Builder().build();
+
+        // Adjust Image Decimation to trade-off detection-range for detection-rate.
+        // e.g. Some typical detection data using a Logitech C920 WebCam
+        // Decimation = 1 ..  Detect 2" Tag from 10 feet away at 10 Frames per second
+        // Decimation = 2 ..  Detect 2" Tag from 6  feet away at 22 Frames per second
+        // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second
+        // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second
+        // Note: Decimation can be changed on-the-fly to adapt during a match.
+        aprilTag.setDecimation(2);
+
+        // Create the vision portal by using a builder.
+        if (USE_WEBCAM) {
+            visionPortal = new VisionPortal.Builder()
+                    .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
+                    .addProcessor(aprilTag)
+                    .build();
+        } else {
+            visionPortal = new VisionPortal.Builder()
+                    .setCamera(BuiltinCameraDirection.BACK)
+                    .addProcessor(aprilTag)
+                    .build();
+        }
+    }
+
+    /*
+     Manually set the camera gain and exposure.
+     This can only be called AFTER calling initAprilTag(), and only works for Webcams;
+    */
+    private void    setManualExposure(int exposureMS, int gain) {
+        // Wait for the camera to be open, then use the controls
+
+        if (visionPortal == null) {
+            return;
+        }
+
+        // Make sure camera is streaming before we try to set the exposure controls
+        if (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING) {
+            telemetry.addData("Camera", "Waiting");
+            telemetry.update();
+            while (!isStopRequested() && (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING)) {
+                sleep(20);
+            }
+            telemetry.addData("Camera", "Ready");
+            telemetry.update();
+        }
+
+        // Set camera controls unless we are stopping.
+        if (!isStopRequested())
+        {
+            ExposureControl exposureControl = visionPortal.getCameraControl(ExposureControl.class);
+            if (exposureControl.getMode() != ExposureControl.Mode.Manual) {
+                exposureControl.setMode(ExposureControl.Mode.Manual);
+                sleep(50);
+            }
+            exposureControl.setExposure((long)exposureMS, TimeUnit.MILLISECONDS);
+            sleep(20);
+            GainControl gainControl = visionPortal.getCameraControl(GainControl.class);
+            gainControl.setGain(gain);
+            sleep(20);
+        }
     }
 }
