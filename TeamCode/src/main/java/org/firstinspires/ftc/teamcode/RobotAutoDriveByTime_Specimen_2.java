@@ -105,8 +105,8 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     //  applied to the drive motors to correct the error.
     //  Drive = Error * Gain    Make these values smaller for smoother control, or larger for a more aggressive response.
     final double SPEED_GAIN  =  0.3  ;   //  Forward Speed Control "Gain". e.g. Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0) = 0.02
-    final double STRAFE_GAIN =  0.015 ;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
-    final double TURN_GAIN   =  0.01  ;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
+    final double STRAFE_GAIN =  0.02 ;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
+    final double TURN_GAIN   =  0.02  ;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
 
     final double MAX_AUTO_SPEED = 0.3;   //  Clip the approach speed to this max value (adjust for your robot)
     final double MAX_AUTO_STRAFE= 0.5;   //  Clip the strafing speed to this max value (adjust for your robot)
@@ -114,7 +114,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     final double APRIL_DISTANCE_THRESHOLD = 0.5;    // Current distance from april tag is under this threshold distance from desired distance.
 
-    final int LEFT_TICK_THRESHOLD = 2; //TODO: tune amount
+    final int LEFT_TICK_THRESHOLD = 100; //TODO: tune amount
 
     private static final boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
     private static final int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
@@ -269,7 +269,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         encoderArm(armPower, hangingSpecimenTicks, 3);
 
         // Step 3: Drive forward for x amount of time and stop
-        driveByTime(0.5, 0, 0, 2,3500);
+        driveByTime(0.5, 0, 0, 2,2000);
 
         // Step 4: Pull arm down
         encoderArm(armPower, armDownTicks, 2);
@@ -279,9 +279,9 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         clawPosition = 0.90;
         clawServo.setPosition(clawPosition);
 
-        // Step: Strafe back halfway TODO: go forward slightly to set distance, then back up a set distance
+        // Step: Drive back halfway
         //driveByTime(-0.5,0,0,0.5,0);
-        driveByTime(-0.4,0,0,1,3500);
+        driveByTime(-0.4,0,0,2,-800);
 
         // Step: Rotate 90 degrees clockwise
         turnToHeading( TURN_SPEED, -90.0);
@@ -301,8 +301,8 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         hingeServo.setPosition(hingePosition);
 
         // Step: Drive forward into observation zone
-        driveByTime(0.4,0,0,0.06,0); // TODO: Change values through testing
-        //driveByTime(0.4,0,0,1,4);
+        //driveByTime(0.4,0,0,0.04,0); // TODO: Change values through testing
+        driveByTime(-0.15,0,0,1,-20);
         sleep(2500);
 
         // Step: Close claw
@@ -311,8 +311,8 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         sleep(500);
 
         // Step: Drive forward into observation zone
-        driveByTime(0.4,0,0,0.01,0); // TODO: Change values through testing
-        //driveByTime(0.4,0,0,1,4);
+        //driveByTime(0.4,0,0,0.01,2); // TODO: Change values through testing
+        driveByTime(0.15,0,0,1,20);
 
         // Step: Lift arm slightly to disengage from wall
         encoderArm(armPower, specimenLiftTicks, 1);
@@ -323,7 +323,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         sleep(500);
 
         // Step: Back up
-        driveByTime(-0.4,0,0,0.06,0); // TODO: Change values through testing
+        //driveByTime(-0.15,0,0,1,-60); // TODO: Change values through testing
         //driveByTime(-0.4,0,0,0.5,8);
 
         // Step: Rotate 90 degrees CCW
@@ -341,7 +341,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
         // Step: Drive forwards
         //driveByTime(0.5,0,0,0.5,0);
-        driveByTime(0.5,0,0,1,3600);
+        driveByTime(0.5,0,0,1,3650);
 
         // Step: Pull arm down
         encoderArm(armPower, armDownTicks, 1);
@@ -351,7 +351,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         clawServo.setPosition(clawPosition);
 
         // Step: Strafe back and to the right to observation zone
-        driveByTime(-0.2, 0.45, 0, 2,0);
+        driveByTime(-0.25, 0.5, 0, 2,0);
 
         // Step: Park and wait for TeleOp
         // TODO
@@ -457,10 +457,15 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         rightBackDrive.setPower(rightBackPower);
 
         int leftPosition = leftFrontDrive.getCurrentPosition();
+        int threshold = LEFT_TICK_THRESHOLD;
+
+        if (Math.abs(ticks) < LEFT_TICK_THRESHOLD) {
+            threshold = 1;
+        }
 
         runtime.reset();
         while (opModeIsActive() && (runtime.seconds() < timeout) &&
-                ( (ticks == 0) || (Math.abs(leftPosition - ticks) > LEFT_TICK_THRESHOLD))) {
+                ( (ticks == 0) || (Math.abs(leftPosition - ticks) > threshold))) {
             telemetry.addData("Path", "Leg 1: %4.1f S Elapsed", runtime.seconds());
             telemetry.addData("Left front wheel target", "at %7d");
             telemetry.addData("Left front wheel currently at", " at %7d",
