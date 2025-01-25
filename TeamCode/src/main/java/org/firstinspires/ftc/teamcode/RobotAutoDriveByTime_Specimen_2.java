@@ -104,15 +104,17 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
     //  Set the GAIN constants to control the relationship between the measured position error, and how much power is
     //  applied to the drive motors to correct the error.
     //  Drive = Error * Gain    Make these values smaller for smoother control, or larger for a more aggressive response.
-    final double SPEED_GAIN  =  0.02  ;   //  Forward Speed Control "Gain". e.g. Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0)
+    final double SPEED_GAIN  =  0.3  ;   //  Forward Speed Control "Gain". e.g. Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0) = 0.02
     final double STRAFE_GAIN =  0.015 ;   //  Strafe Speed Control "Gain".  e.g. Ramp up to 37% power at a 25 degree Yaw error.   (0.375 / 25.0)
     final double TURN_GAIN   =  0.01  ;   //  Turn Control "Gain".  e.g. Ramp up to 25% power at a 25 degree error. (0.25 / 25.0)
 
-    final double MAX_AUTO_SPEED = 0.5;   //  Clip the approach speed to this max value (adjust for your robot)
+    final double MAX_AUTO_SPEED = 0.3;   //  Clip the approach speed to this max value (adjust for your robot)
     final double MAX_AUTO_STRAFE= 0.5;   //  Clip the strafing speed to this max value (adjust for your robot)
     final double MAX_AUTO_TURN  = 0.3;   //  Clip the turn speed to this max value (adjust for your robot)
 
     final double APRIL_DISTANCE_THRESHOLD = 0.5;    // Current distance from april tag is under this threshold distance from desired distance.
+
+    final int LEFT_TICK_THRESHOLD = 2; //TODO: tune amount
 
     private static final boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
     private static final int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
@@ -132,7 +134,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     // These constants define the desired driving/control characteristics
     // They can/should be tweaked to suit the specific robot drive train.
-    static final double     TURN_SPEED              = 0.8;     // Max turn speed to limit turn rate.
+    static final double     TURN_SPEED              = 0.4;     // Max turn speed to limit turn rate.
     static final double     HEADING_THRESHOLD       = 0.5 ;    // How close must the heading get to the target before moving to next step.
     // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
 
@@ -170,6 +172,10 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
         rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
         rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+
+        //set up encoder for measurement
+        leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftFrontDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         //add config for new motor (telescoping arm)
         armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
@@ -231,73 +237,100 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         //          Add a sleep(2000) after any step to keep the telemetry data visible for review
 
         //calculate arm power based on joystick from gamepad2
-        double armPower = 0.65;
+        double armPower = 0.8;
 
         // Declare new target value for specimen hanging height
-        int hangingSpecimenTicks = 1400; //TODO: test value
+        int hangingSpecimenTicks = 3200; //TODO: test value
 
         // Declare new target value for arm bottom height
-        int armDownTicks = 0;
+        int armDownTicks = 1500;
+
+        // Declare new target value for specimen pick up height
+        int specimenGrabTicks = 3900;
 
         // Declare new target value for specimen lift-off height
-        int specimenLiftTicks = 50; //TODO: test value
+        int specimenLiftTicks = 4200; //TODO: test value
+
+        // Declare new target value for specimen lift-off height
+        double hingeDown = 0.01; //TODO: test value
+
+        // Declare new target value for specimen lift-off height
+        double hingeUp = 0.29; //TODO: test value
 
         // Step 1: Close claw
         clawPosition = 0.50;
         clawServo.setPosition(clawPosition);
 
+        // Step: Raise hinge
+        hingePosition = hingeUp;
+        hingeServo.setPosition(hingePosition);
+
         // Step 2: Lift arm
         encoderArm(armPower, hangingSpecimenTicks, 3);
 
         // Step 3: Drive forward for x amount of time and stop
-        driveByTime(0.5, 0, 0, 2);
+        driveByTime(0.5, 0, 0, 2,3500);
 
         // Step 4: Pull arm down
-        encoderArm(armPower, armDownTicks, 1);
+        encoderArm(armPower, armDownTicks, 2);
+
 
         // Step: Open claw
         clawPosition = 0.90;
         clawServo.setPosition(clawPosition);
 
-        // Step: Strafe back halfway
-        driveByTime(-0.5,0,0,0.7);
+        // Step: Strafe back halfway TODO: go forward slightly to set distance, then back up a set distance
+        //driveByTime(-0.5,0,0,0.5,0);
+        driveByTime(-0.4,0,0,1,3500);
 
         // Step: Rotate 90 degrees clockwise
         turnToHeading( TURN_SPEED, -90.0);
 
-        // Step: Lower arm hinge to specimen pick - up height
-        hingePosition = 0.17;                       // TODO: Change values through testing
-        hingeServo.setPosition(hingePosition);
+        // Step: Raise arm
+        encoderArm(armPower, specimenGrabTicks, 2);
 
         // Step: Drive forward TODO: drive with april tags
-        driveToAprilTag(12);
+        driveToAprilTag(27);
         //driveByTime(0.6,0 , 0, 1.8);
 
         // Step: Rotate an additional 90 degrees clockwise
         turnToHeading( TURN_SPEED, -180.0);
 
+        // Step: Lower arm hinge to specimen pick - up height
+        hingePosition = hingeDown;                       // TODO: Change values through testing
+        hingeServo.setPosition(hingePosition);
+
         // Step: Drive forward into observation zone
-        driveByTime(0.4,0,0,0.5); // TODO: Change values through testing
+        driveByTime(0.4,0,0,0.06,0); // TODO: Change values through testing
+        //driveByTime(0.4,0,0,1,4);
+        sleep(2500);
 
         // Step: Close claw
         clawPosition = 0.50;
         clawServo.setPosition(clawPosition);
+        sleep(500);
+
+        // Step: Drive forward into observation zone
+        driveByTime(0.4,0,0,0.01,0); // TODO: Change values through testing
+        //driveByTime(0.4,0,0,1,4);
 
         // Step: Lift arm slightly to disengage from wall
         encoderArm(armPower, specimenLiftTicks, 1);
 
         // Step: Raise arm hinge
-        hingePosition = 1.0;                       // TODO: Change values through testing
+        hingePosition = hingeUp;                       // TODO: Change values through testing
         hingeServo.setPosition(hingePosition);
+        sleep(500);
 
         // Step: Back up
-        driveByTime(-0.4,0,0,0.5); // TODO: Change values through testing
+        driveByTime(-0.4,0,0,0.06,0); // TODO: Change values through testing
+        //driveByTime(-0.4,0,0,0.5,8);
 
         // Step: Rotate 90 degrees CCW
         turnToHeading( TURN_SPEED, -90);
 
         // Step: drive backwards back to submersible
-        driveToAprilTag(48);
+        driveToAprilTag(58);
         //driveByTime(0.6,0 , 0, 1.55);
 
         // Step: Raise arm
@@ -307,15 +340,21 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         turnToHeading( TURN_SPEED, 0);
 
         // Step: Drive forwards
-        driveByTime(0.5,0,0,0.7);
+        //driveByTime(0.5,0,0,0.5,0);
+        driveByTime(0.5,0,0,1,3600);
 
         // Step: Pull arm down
         encoderArm(armPower, armDownTicks, 1);
 
+        // Step: Open claw
+        clawPosition = 0.90;
+        clawServo.setPosition(clawPosition);
+
         // Step: Strafe back and to the right to observation zone
-        driveByTime(-0.2, 0.6, 0, 2);
+        driveByTime(-0.2, 0.45, 0, 2,0);
 
         // Step: Park and wait for TeleOp
+        // TODO
 
         telemetry.addData("Path", "Complete");
         telemetry.update();
@@ -382,9 +421,10 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
      *  TODO: Make a new copy of this that takes both timeout and encoder ticks.
      */
     public void driveByTime(double axial,
-                             double lateral,
-                             double yaw,
-                             double timeout) {
+                            double lateral,
+                            double yaw,
+                            double timeout,
+                            int ticks) {
 
         // Combine the joystick requests for each axis-motion to determine each wheel's power.
         // Set up a variable for each drive wheel to save the power level for telemetry.
@@ -392,6 +432,9 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         double rightFrontPower = axial - lateral - yaw;
         double leftBackPower = axial - lateral + yaw;
         double rightBackPower = axial + lateral - yaw;
+
+        leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftFrontDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         // Normalize the values so no wheel power exceeds 100%
         // This ensures that the robot maintains the desired motion.
@@ -413,10 +456,17 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         leftBackDrive.setPower(leftBackPower);
         rightBackDrive.setPower(rightBackPower);
 
+        int leftPosition = leftFrontDrive.getCurrentPosition();
+
         runtime.reset();
-        while (opModeIsActive() && (runtime.seconds() < timeout)) {
+        while (opModeIsActive() && (runtime.seconds() < timeout) &&
+                ( (ticks == 0) || (Math.abs(leftPosition - ticks) > LEFT_TICK_THRESHOLD))) {
             telemetry.addData("Path", "Leg 1: %4.1f S Elapsed", runtime.seconds());
+            telemetry.addData("Left front wheel target", "at %7d");
+            telemetry.addData("Left front wheel currently at", " at %7d",
+                    leftPosition);
             telemetry.update();
+            leftPosition = leftFrontDrive.getCurrentPosition();
         }
 
         // Send calculated power to wheels to stop
@@ -468,7 +518,6 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
             leftBackDrive.setPower(leftBackPower);
             rightBackDrive.setPower(rightBackPower);
 
-
             // Display drive status for the driver.
             sendTelemetry(false);
         }
@@ -498,7 +547,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         if (headingError > 20) {
             steeringCorrection = Range.clip(headingError * proportionalGain, -1, 1);
         } else {
-            steeringCorrection = Range.clip(headingError * proportionalGain * 0.5, -1, 1);
+            steeringCorrection = Range.clip(headingError * proportionalGain * 0.2, -1, 1);
         }
 
         return steeringCorrection;
@@ -526,27 +575,31 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         double  drive           = 0;        // Desired forward power/speed (-1 to +1)
         double  strafe          = 0;        // Desired strafe power/speed (-1 to +1)
         double  turn            = 0;        // Desired turning power/speed (-1 to +1)
+        List<AprilTagDetection> currentDetections;
 
         desiredTag  = null;
 
-        // Step through the list of detected tags and look for a matching tag
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-        for (AprilTagDetection detection : currentDetections) {
-            // Look to see if we have size info on this tag.
-            if (detection.metadata != null) {
-                //  Check to see if we want to track towards this tag.
-                if ((DESIRED_TAG_ID < 0) || (detection.id == DESIRED_TAG_ID)) {
-                    // Yes, we want to use this tag.
-                    targetFound = true;
-                    desiredTag = detection;
-                    break;  // don't look any further.
+        runtime.reset();
+        while (opModeIsActive() && !targetFound && runtime.seconds() < 0.5) {
+            // Step through the list of detected tags and look for a matching tag
+            currentDetections = aprilTag.getDetections();
+            for (AprilTagDetection detection : currentDetections) {
+                // Look to see if we have size info on this tag.
+                if (detection.metadata != null) {
+                    //  Check to see if we want to track towards this tag.
+                    if ((DESIRED_TAG_ID < 0) || (detection.id == DESIRED_TAG_ID)) {
+                        // Yes, we want to use this tag.
+                        targetFound = true;
+                        desiredTag = detection;
+                        break;  // don't look any further.
+                    } else {
+                        // This tag is in the library, but we do not want to track it right now.
+                        telemetry.addData("Skipping", "Tag ID %d is not desired", detection.id);
+                    }
                 } else {
-                    // This tag is in the library, but we do not want to track it right now.
-                    telemetry.addData("Skipping", "Tag ID %d is not desired", detection.id);
+                    // This tag is NOT in the library, so we don't have enough information to track to it.
+                    telemetry.addData("Unknown", "Tag ID %d is not in TagLibrary", detection.id);
                 }
-            } else {
-                // This tag is NOT in the library, so we don't have enough information to track to it.
-                telemetry.addData("Unknown", "Tag ID %d is not in TagLibrary", detection.id);
             }
         }
 
@@ -559,8 +612,8 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
             // TODO: Wrap this in a while loop.  Keep looping while
             // absolute value of (distance from april tag - desiredDistance) is more than 0.5 inch.
-            while (opModeIsActive() &&
-                    (Math.abs(desiredTag.ftcPose.range - desiredDistance) > APRIL_DISTANCE_THRESHOLD)) {
+            while (opModeIsActive() && targetFound &&
+                    (Math.abs(desiredTag.ftcPose.range - desiredDistance) > APRIL_DISTANCE_THRESHOLD) ) {
 
                 // Determine heading, range and Yaw (tag image rotation) error so we can use them to control the robot automatically.
                 double rangeError = (desiredTag.ftcPose.range - desiredDistance);
@@ -572,20 +625,51 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
                 turn = Range.clip(headingError * TURN_GAIN, -MAX_AUTO_TURN, MAX_AUTO_TURN);
                 strafe = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE);
 
+                telemetry.addData("Range",  "%5.1f inches", desiredTag.ftcPose.range);
+                telemetry.addData("Bearing","%3.0f degrees", desiredTag.ftcPose.bearing);
+                telemetry.addData("Yaw","%3.0f degrees", desiredTag.ftcPose.yaw);
                 telemetry.addData("Auto", "Drive %5.2f, Strafe %5.2f, Turn %5.2f ", drive, strafe, turn);
                 telemetry.update();
 
                 // Apply desired axes motions to the drivetrain.
                 moveRobot(drive, strafe, turn);
                 sleep(10);
+
+                // refresh the camera data
+                currentDetections = aprilTag.getDetections();
+                targetFound = false;
+                for (AprilTagDetection detection : currentDetections) {
+                    // Look to see if we have size info on this tag.
+                    if (detection.metadata != null) {
+                        //  Check to see if we want to track towards this tag.
+                        if ((DESIRED_TAG_ID < 0) || (detection.id == DESIRED_TAG_ID)) {
+                            // Yes, we want to use this tag.
+                            targetFound = true;
+                            desiredTag = detection;
+                            break;  // don't look any further.
+                        } else {
+                            // This tag is in the library, but we do not want to track it right now.
+                            telemetry.addData("Skipping", "Tag ID %d is not desired", detection.id);
+                        }
+                    } else {
+                        // This tag is NOT in the library, so we don't have enough information to track to it.
+                        telemetry.addData("Unknown", "Tag ID %d is not in TagLibrary", detection.id);
+                    }
+                }
             }
+
+            // Stop all motion;
+            leftFrontDrive.setPower(0);
+            rightFrontDrive.setPower(0);
+            leftBackDrive.setPower(0);
+            rightBackDrive.setPower(0);
 
         } else {
             // Error case. Could not find an April Tag.
             telemetry.addData("\n>","NO TARGET FOUND\n");
             telemetry.update();
 
-            sleep(2000)
+            sleep(2000);
         }
     }
 
