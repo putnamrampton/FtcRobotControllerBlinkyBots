@@ -134,7 +134,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     // These constants define the desired driving/control characteristics
     // They can/should be tweaked to suit the specific robot drive train.
-    static final double     TURN_SPEED              = 0.4;     // Max turn speed to limit turn rate.
+    static final double     TURN_SPEED              = 0.3;     // Max turn speed to limit turn rate.
     static final double     HEADING_THRESHOLD       = 0.5 ;    // How close must the heading get to the target before moving to next step.
     // Requiring more accuracy (a smaller number) will often make the turn take longer to get into the final position.
 
@@ -300,9 +300,11 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
         hingePosition = hingeDown;                       // TODO: Change values through testing
         hingeServo.setPosition(hingePosition);
 
-        // Step: Drive forward into observation zone
+        // Step: Drive towards from observation zone
         //driveByTime(0.4,0,0,0.04,0); // TODO: Change values through testing
-        driveByTime(-0.15,0,0,1,-20);
+
+       // driveByTime(-0.15,0,0,1,-10);
+        driveByTime(0.2,0,0,1,30);
         sleep(2500);
 
         // Step: Close claw
@@ -312,7 +314,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
         // Step: Drive forward into observation zone
         //driveByTime(0.4,0,0,0.01,2); // TODO: Change values through testing
-        driveByTime(0.15,0,0,1,20);
+        driveByTime(0.15,0,0,1,10);
 
         // Step: Lift arm slightly to disengage from wall
         encoderArm(armPower, specimenLiftTicks, 1);
@@ -341,7 +343,7 @@ public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
         // Step: Drive forwards
         //driveByTime(0.5,0,0,0.5,0);
-        driveByTime(0.5,0,0,1,3650);
+        driveByTime(0.5,0,0,1,3700);
 
         // Step: Pull arm down
         encoderArm(armPower, armDownTicks, 1);
