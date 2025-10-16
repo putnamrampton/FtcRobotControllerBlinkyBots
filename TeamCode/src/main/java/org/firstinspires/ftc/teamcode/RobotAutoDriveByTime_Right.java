@@ -55,6 +55,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  */
 
 @Autonomous(name="Strafe Right", group="Robot")
+@Disabled
 public class RobotAutoDriveByTime_Right extends LinearOpMode {
 
     /* Declare OpMode members. */

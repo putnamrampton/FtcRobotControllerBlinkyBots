@@ -29,10 +29,8 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -66,9 +64,17 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@TeleOp(name="Basic: Omni Linear OpMode (CRservo)", group="Linear OpMode")
-@Disabled
-public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
+/*
+ * TODO: 2025-26 Blinky Bots main requirements
+ * 4 motors for the wheels
+ * 2 motors for launcher
+ * Servo for gate
+ * Roadrunner odometry pods (3?)
+ */
+
+@TeleOp(name="Basic: Omni Linear OpMode (normal servo) 25-26", group="Linear OpMode")
+//@Disabled
+public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
 
     // Declare OpMode members for each of the 4 motors.
     private ElapsedTime runtime = new ElapsedTime();
@@ -77,26 +83,40 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
     private DcMotor rightFrontDrive = null;
     private DcMotor rightBackDrive = null;
 
-    //telescoping arm
-    private DcMotor armDrive = null;
+    //telescoping arm not in use
+    //private DcMotor armDrive = null;
 
-    //servo claw
-    static final int    CYCLE_MS    =   50;     // period of each cycle
+    // Declare OpMode members for the launch motors
+    private DcMotor rightLaunchDrive = null;
+    private DcMotor leftLaunchDrive = null;
+
+    // Set constant power level for the launch motors
+    static final double LAUNCH_POWER = 1; //TODO: Tune value
+
+    //servo claw not in use
+    //static final int    CYCLE_MS    =   50;     // period of each cycle
     /*
     * static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
     * static final double MAX_POS     =  1.0;     // Maximum rotational position
     * static final double MIN_POS     =  0.0;     // Minimum rotational position
     */
-    // Define class members
-    Servo   clawServo;
-    //Servo   hingeServo; // Standard servo
-    CRServo   hingeServo; // Continuous servo
-    double  clawPosition = 0.50;  //guessing middle is 0.50
-    //double  hingePosition = 1; //up position is one
+    //Define class members
+    /*Servo   clawServo; // Servo not in use
+    *Servo   hingeServo; // Standard servo
+    *CRServo   hingeServo; // Continuous servo
+    *double  clawPosition = 0.50;  //guessing middle is 0.50
+    *double  hingePosition = 1; //up position is one
+    */
 
-    private double hingeTrim = 0; //trim to add/subtract from hinge position
+    //Servo for release mechanism (gate) currently unused
+    private Servo gateServo;
 
-    double hingePower = 0; // Continuous servo.  0.5 is off.  0.0 and 1.0 are the min and max.
+    double gatePosition = 0.6; // TODO: Change if need be
+    private long CYCLE_MS;
+
+    //private double hingeTrim = 0; //trim to add/subtract from hinge position
+
+    //double hingePower = 0; // Continuous servo.  0.5 is off.  0.0 and 1.0 are the min and max.
     //boolean rampUp = true;
 
 /*
@@ -128,18 +148,25 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
 
         //add config for new motor (telescoping arm)
-        armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
-        armDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        //armDrive = hardwareMap.get(DcMotor.class, "arm_drive");
+        //armDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         //armDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         //armDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
+        //Add config for new motors (launch wheels)
+        rightLaunchDrive = hardwareMap.get(DcMotor.class, "right_launch_drive"); // Port 0
+        leftLaunchDrive = hardwareMap.get(DcMotor.class, "left_launch_drive");
+
         // Connect to servo (Assume Robot Left Hand)
         // Change the text in quotes to match any servo name on your robot.
-        clawServo = hardwareMap.get(Servo.class, "claw_hand");
+        //clawServo = hardwareMap.get(Servo.class, "claw_hand");
 
         // Connect to servo
-        hingeServo = hardwareMap.get(CRServo.class, "arm_hinge");
+        //hingeServo = hardwareMap.get(CRServo.class, "arm_hinge");
         //hingeServo = hardwareMap.get(Servo.class, "arm_hinge");
+
+        // Connect to servo
+        gateServo = hardwareMap.get(Servo.class, "gate_servo");
 
         // Send telemetry message to indicate successful Encoder reset
         //telemetry.addData("Arm location starting at",  "%7d",
@@ -168,8 +195,9 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
             rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
             rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
 
-            // Set direction for the telescoping arm
-            armDrive.setDirection(DcMotor.Direction.REVERSE);
+            // TODO: Set direction for the launch mechanism
+            rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
+            leftLaunchDrive.setDirection(DcMotor.Direction.FORWARD);
 
             // Wait for the game to start (driver presses START)
             telemetry.addData("Status", "Initialized");
@@ -201,25 +229,41 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
                 double rightBackPower = axial + lateral - yaw;
 
                 //gamepad2 - control the arms - right joystick up to extend, down to retract
-                double axial2 = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
+                //double axial2 = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
 
                 //calculate arm power based on joystick from gamepad2
-                double armPower = axial2 * 0.85;
+                //double armPower = axial2;
                 //Overiding armPower to keep the telescoping arm from falling
-                if (armPower == 0) {
-                    armPower = 0.05;
+                //if (armPower == 0) {
+                    //armPower = 0.05;
+
+
+                //gamepad2 - control launch mechanism - right bumper pressed for release
+                boolean rightBumperPressed = gamepad2.right_bumper;
+
+                // Set up a variable for each launch wheel to set power level
+                double leftLaunchPower = 0;
+                double rightLaunchPower = 0;
+
+                // Control launcher movement through bumper
+                if (rightBumperPressed) {
+                    leftLaunchPower = LAUNCH_POWER;
+                    rightLaunchPower = LAUNCH_POWER;
+                } else {
+                    leftLaunchPower = 0;
+                    rightLaunchPower = 0;
                 }
 
-
                 //gamepad2 - control arm hinge - dpad_down pressed for lowest point
-                boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
+                //boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
 
                 //gamepad2 - control arm hinge - dpad_up pressed for highest point
-                boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
+                //boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
 
                 //gamepad2 - control arm hinge - dpad_left pressed for intermediate position
-                boolean dpadLeftPressed = gamepad2.dpad_left;  // dpad left button gamepad 2
+                //boolean dpadLeftPressed = gamepad2.dpad_left;  // dpad left button gamepad 2
 
+                /*
                 // Control hinge movement through buttons
                 if (dpadDownPressed) { //hinge down
                     hingePower = -1.0;
@@ -228,31 +272,60 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
                 } else {
                     hingePower = 0.04;
                 }
-
-                /*
-                // Control hinge movement through buttons
-                // TODO: find the right values by testing
-                if (dpadDownPressed) { // Hinge all the way down
-                    hingePosition = 0.0; // Assuming 1 is the low point
-                } else if (dpadUpPressed) { // Hinge all the way up
-                    hingePosition = 0.29; // Assuming 0 is the up position
-                } else if (dpadLeftPressed) { // Hinge at specimen height
-                    hingePosition = 0.19; // Assuming 0.5 is somewhere in the middle (will tweak)
-                }
                 */
 
+                // Control hinge movement through buttons
+                // TODO: find the right values by testing
+                /* if (dpadDownPressed) { // Hinge all the way down
+                    hingePosition = 0.0;
+                } else if (dpadUpPressed) { // Hinge all the way up
+                    hingePosition = 0.29;
+                } else if (dpadLeftPressed) { // Hinge at specimen height
+                    hingePosition = 0.17;
+                }
+                 */
+
+                //left bumper pressed for subtraction
+                //boolean leftBumperPressed = gamepad2.left_bumper; //
+
+                //right bumper pressed for addition
+                //boolean rightBumperPressed = gamepad2.right_bumper;
+
+                //control hinge trim through bumpers
+                /*if (leftBumperPressed) {
+                    hingeTrim -= 0.01;
+                } else if (rightBumperPressed) {
+                    hingeTrim += 0.005;
+                }
+                 */
+
                 //gamepad2 - control claw intake - a pressed for open
-                boolean buttonAPressed = gamepad2.a;  // A gamepad 2
+                //boolean buttonAPressed = gamepad2.a;  // A gamepad 2
 
                 //gamepad2 - control claw intake - b pressed for close
-                boolean buttonBPressed = gamepad2.b;  // B gamepad 2
+                //boolean buttonBPressed = gamepad2.b;  // B gamepad 2
+
+                //gamepad2 - control gate movement - x pressed for open
+                boolean buttonXPressed = gamepad2.x;
+
+                //gamepad2 - control gate movement - y pressed for open
+                boolean buttonYPressed = gamepad2.y;
 
                 // Control claw movement through buttons
-                if (buttonAPressed) { //close the claw
+                /*if (buttonAPressed) { //close the claw
                     clawPosition = 0.50;
                 } else if (buttonBPressed) { //open the claw
                     clawPosition = 0.90;
                 }
+                 */
+
+                //Control gate movement through buttons
+                if (buttonXPressed) { //open the gate
+                    gatePosition = 0;
+                } else if (buttonYPressed) { //close the gate
+                    gatePosition = 0.6;
+                }
+
 
                 /*
                 Encoder mode
@@ -312,31 +385,41 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
                 rightBackDrive.setPower(rightBackPower);
 
                 // Send calculated power to telescoping arm
-                armDrive.setPower(armPower);
+                //armDrive.setPower(armPower);
+
+                // Set calculated power to launcher
+                leftLaunchDrive.setPower(leftLaunchPower);
+                rightLaunchDrive.setPower(rightLaunchPower);
 
                 //encoderDrive(0.5, targetTicks, 2);
 
                 // Set the servo to the new position and pause;
-                clawServo.setPosition(clawPosition);
+                //clawServo.setPosition(clawPosition);
 
                 // Set the servo to the new position and pause
-                //hingeServo.setPosition(hingePosition); // Standard servo
+                //hingeServo.setPosition(hingePosition + hingeTrim); // Standard servo
 
-                hingeServo.setPower(hingePower); // Continuous servo
+                //hingeServo.setPower(hingePower); // Continuous servo
+
+                //Set the gate servo to new position and pause
+                gateServo.setPosition(gatePosition);
 
                 // Show the elapsed game time and wheel power.
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
                 telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
                 telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-                telemetry.addData("Arm", "%5.2f", armPower);
+                telemetry.addData("Launcher Left/Right", "%4.2f, %4.2f", leftLaunchPower, rightLaunchPower);
+                telemetry.addData("gatePosition", "%4.2f", gatePosition);
+                //telemetry.addData("Arm", "%5.2f", armPower);
                 // telemetry.update();
 
                 // Display the current value
                 // telemetry.addData("Servo Max", "%5.2f", MAX_POS);
                 // telemetry.addData("Servo Min", "%5.2f", MIN_POS);
-                telemetry.addData("Claw Position", "%5.2f", clawPosition);
+                //telemetry.addData("Claw Position", "%5.2f", clawPosition);
                 //telemetry.addData("Hinge Position", "%5.2f", hingePosition); // Standard servo
-                telemetry.addData("Hinge Power", "%4.2f", hingePower);
+                //telemetry.addData("Hinge power", "%4.2f", hingePower);
+                //telemetry.addData("Trim amount","%4.2f", hingeTrim);
                 telemetry.addData(">", "Press Stop to end test.");
                 telemetry.update();
 
@@ -355,6 +438,8 @@ public class BasicOmniOpMode_Linear_BB_CR extends LinearOpMode {
      *  1) Move gets to the desired position
      *  2) Move runs out of time
      *  3) Driver stops the OpMode running.
+     *
+     *
      */
     /*public void encoderDrive(double speed,
                              int targetTicks,

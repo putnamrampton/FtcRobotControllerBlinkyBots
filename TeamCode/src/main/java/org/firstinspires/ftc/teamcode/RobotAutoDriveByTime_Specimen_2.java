@@ -31,6 +31,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
@@ -67,6 +68,7 @@ import java.util.concurrent.TimeUnit;
  */
 
 @Autonomous(name="Double Specimen Hang", group="Robot")
+@Disabled
 public class RobotAutoDriveByTime_Specimen_2 extends LinearOpMode {
 
     /* Declare OpMode members. */
