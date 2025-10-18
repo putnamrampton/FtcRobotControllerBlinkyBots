@@ -91,7 +91,8 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     private DcMotor leftLaunchDrive = null;
 
     // Set constant power level for the launch motors
-    static final double LAUNCH_POWER = 1; //TODO: Tune value
+    static final double LAUNCH_POWER_LESS = 0.5; //TODO: Tune value (between 0 and 1)
+    static final double LAUNCH_POWER_MORE = 0.6;
 
     //servo claw not in use
     //static final int    CYCLE_MS    =   50;     // period of each cycle
@@ -237,21 +238,23 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 //if (armPower == 0) {
                     //armPower = 0.05;
 
+                //gamepad2 - control the launcher - right joystick to launch
+                //double launchPower = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
 
                 //gamepad2 - control launch mechanism - right bumper pressed for release
                 boolean rightBumperPressed = gamepad2.right_bumper;
+                boolean leftBumperPressed = gamepad2.left_bumper;
 
                 // Set up a variable for each launch wheel to set power level
-                double leftLaunchPower = 0;
-                double rightLaunchPower = 0;
+                double launchPower;
 
                 // Control launcher movement through bumper
                 if (rightBumperPressed) {
-                    leftLaunchPower = LAUNCH_POWER;
-                    rightLaunchPower = LAUNCH_POWER;
+                    launchPower = LAUNCH_POWER_MORE;
+                } else if (leftBumperPressed){
+                    launchPower = LAUNCH_POWER_LESS;
                 } else {
-                    leftLaunchPower = 0;
-                    rightLaunchPower = 0;
+                    launchPower = 0;
                 }
 
                 //gamepad2 - control arm hinge - dpad_down pressed for lowest point
@@ -388,8 +391,8 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 //armDrive.setPower(armPower);
 
                 // Set calculated power to launcher
-                leftLaunchDrive.setPower(leftLaunchPower);
-                rightLaunchDrive.setPower(rightLaunchPower);
+                leftLaunchDrive.setPower(launchPower);
+                rightLaunchDrive.setPower(launchPower);
 
                 //encoderDrive(0.5, targetTicks, 2);
 
@@ -408,7 +411,7 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
                 telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
                 telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-                telemetry.addData("Launcher Left/Right", "%4.2f, %4.2f", leftLaunchPower, rightLaunchPower);
+                telemetry.addData("Launcher Left/Right", "%4.2f", launchPower);
                 telemetry.addData("gatePosition", "%4.2f", gatePosition);
                 //telemetry.addData("Arm", "%5.2f", armPower);
                 // telemetry.update();
