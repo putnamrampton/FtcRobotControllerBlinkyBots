@@ -422,6 +422,14 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 //Set the gate servo to new position and pause
                 gateServo.setPosition(gatePosition);
 
+                // At button press, the gateServo go to its up position
+                // At 1500ms: go 1/3 of the way down
+                // At 1700ms: go 2/3 of the way down
+                // At 1900ms: go to the down position
+                // If direct control buttons are pressed, this loop should stop
+                // If button pressed again, restart the sequence
+                // Make a variable for while the gate is lowering
+
                 // Show the elapsed game time and wheel power.
                 telemetry.addData("Status", "Run Time: " + runtime.toString());
                 telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
