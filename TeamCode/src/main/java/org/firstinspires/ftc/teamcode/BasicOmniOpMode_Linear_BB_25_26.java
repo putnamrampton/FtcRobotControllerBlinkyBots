@@ -91,8 +91,10 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     private DcMotor leftLaunchDrive = null;
 
     // Set constant power level for the launch motors
-    static final double LAUNCH_POWER_LESS = 0.5; //TODO: Tune value (between 0 and 1)
-    static final double LAUNCH_POWER_MORE = 0.6;
+    static final double LAUNCH_POWER_LESS = 0.6; //TODO: Tune value (between 0 and 1)
+    static final double LAUNCH_POWER_MORE = 0.65;
+
+    private double launchTrim = 0; // TODO: This is buggy - always runs
 
     //servo claw not in use
     //static final int    CYCLE_MS    =   50;     // period of each cycle
@@ -249,12 +251,25 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 double launchPower;
 
                 // Control launcher movement through bumper
-                if (rightBumperPressed) {
+                if (leftBumperPressed) {
                     launchPower = LAUNCH_POWER_MORE;
-                } else if (leftBumperPressed){
+                } else if (rightBumperPressed){
                     launchPower = LAUNCH_POWER_LESS;
                 } else {
                     launchPower = 0;
+                }
+
+                //dpad up pressed for addition
+                boolean dpadUpPressed = gamepad2.dpad_up;
+
+                //dpad down pressed for subtraction
+                boolean dpadDownPressed = gamepad2.dpad_down;
+
+                //control launch velocity trim through bumpers
+                if (dpadUpPressed) {
+                    launchTrim -= 0.01;
+                } else if (dpadDownPressed) {
+                    launchTrim += 0.01;
                 }
 
                 //gamepad2 - control arm hinge - dpad_down pressed for lowest point
@@ -413,6 +428,7 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
                 telemetry.addData("Launcher Left/Right", "%4.2f", launchPower);
                 telemetry.addData("gatePosition", "%4.2f", gatePosition);
+                telemetry.addData("Trim amount", "Trim amount", launchTrim);
                 //telemetry.addData("Arm", "%5.2f", armPower);
                 // telemetry.update();
 
