@@ -114,7 +114,7 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     //Servo for release mechanism (gate) currently unused
     private Servo gateServo;
 
-    double gatePosition = 0.6; // TODO: Change if need be
+    double gatePosition = 0; // TODO: Change if need be
     private long CYCLE_MS;
 
     //private double hingeTrim = 0; //trim to add/subtract from hinge position
