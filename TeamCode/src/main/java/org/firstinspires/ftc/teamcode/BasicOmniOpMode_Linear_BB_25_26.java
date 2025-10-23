@@ -338,9 +338,9 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                  */
 
                 //Control gate movement through buttons
-                if (buttonXPressed) { //open the gate
+                if (buttonXPressed) { //down position
                     gatePosition = 0;
-                } else if (buttonYPressed) { //close the gate
+                } else if (buttonYPressed) { //up position
                     gatePosition = 0.6;
                 }
 
