@@ -67,7 +67,7 @@ import java.util.concurrent.TimeUnit;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Shooting", group="Robot")
+@Autonomous(name="Red Goal", group="Robot")
 public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
 
     /* Declare OpMode members. */

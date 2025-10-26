@@ -29,6 +29,10 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.GATE_DOWN;
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.GATE_UP;
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.LAUNCH_SPEED;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -344,6 +348,12 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                     gatePosition = 0.6;
                 }
 
+                //Button pressed for automated shooting
+                float rightTriggerPressed = gamepad2.right_trigger;
+                if (rightTriggerPressed > 0.2 ) {
+                   automatedShoot();
+                }
+
 
                 /*
                 Encoder mode
@@ -458,6 +468,64 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
             telemetry.addData(">", "Done");
             telemetry.update();
         }
+
+    public void automatedShoot() {
+
+        //Step: Launch wheels rolling
+        leftLaunchDrive.setPower(LAUNCH_SPEED);
+        rightLaunchDrive.setPower(LAUNCH_SPEED);
+
+        //Step: Wait for wheel momentum
+        sleep(2000);
+        telemetry.addData("Step","3");
+        telemetry.update();
+
+        //Step: Servo push the ball up 1
+        gateServo.setPosition(GATE_UP);
+        telemetry.addData("Step", "4");
+        telemetry.update();
+
+        //Step: sleep
+        sleep(1000);
+
+        //Step: put the gate down
+        gateServo.setPosition(GATE_DOWN);
+        telemetry.addData("Gate", "down");
+        telemetry.update();
+
+        //Step: Pause
+        sleep(500);
+
+        //Step: Servo push ball 2
+        gateServo.setPosition(GATE_UP);
+        telemetry.addData("Gate", "Up");
+        telemetry.update();
+
+        //Step: sleep
+        sleep(1000);
+
+        //Step: put the gate down
+        gateServo.setPosition(GATE_DOWN);
+        telemetry.addData("Gate", "down");
+        telemetry.update();
+
+        //Step: Pause
+        sleep(500);
+
+        //Step: Servo push ball 3
+        gateServo.setPosition(GATE_UP);
+        telemetry.addData("Gate", "Up");
+        telemetry.update();
+
+        //Step: sleep
+        sleep(1000);
+
+        //Step: put the gate down
+        gateServo.setPosition(GATE_DOWN);
+        telemetry.addData("Gate", "down");
+        telemetry.update();
+
+    }
 
     /*
      *  Method to perform a move to an exact position, based on encoder counts.
