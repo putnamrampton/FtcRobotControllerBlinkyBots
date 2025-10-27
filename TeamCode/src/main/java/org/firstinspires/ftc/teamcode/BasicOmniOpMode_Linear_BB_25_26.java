@@ -472,8 +472,8 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     public void automatedShoot() {
 
         //Step: Launch wheels rolling
-        leftLaunchDrive.setPower(LAUNCH_SPEED);
-        rightLaunchDrive.setPower(LAUNCH_SPEED);
+        leftLaunchDrive.setPower(LAUNCH_POWER_LESS);
+        rightLaunchDrive.setPower(LAUNCH_POWER_LESS);
 
         //Step: Wait for wheel momentum
         sleep(2000);
