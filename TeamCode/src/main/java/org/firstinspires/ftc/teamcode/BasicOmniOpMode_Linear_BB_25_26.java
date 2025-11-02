@@ -29,15 +29,17 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.GATE_DOWN;
-import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.GATE_UP;
-import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal_Red.LAUNCH_SPEED;
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal.GATE_DOWN;
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal.GATE_UP;
+import static org.firstinspires.ftc.teamcode.RobotAutoDriveByTime_Goal.LAUNCH_SPEED;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /*
  * TODO: gyro driving for hard turn 180
@@ -81,7 +83,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
 
     // Declare OpMode members for each of the 4 motors.
-    private ElapsedTime runtime = new ElapsedTime();
+    private final ElapsedTime runtime = new ElapsedTime();
     private DcMotor leftFrontDrive = null;
     private DcMotor leftBackDrive = null;
     private DcMotor rightFrontDrive = null;
@@ -97,23 +99,28 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     // Set constant power level for the launch motors
     static final double LAUNCH_POWER_LESS = 0.6; //TODO: Tune value (between 0 and 1)
     static final double LAUNCH_POWER_MORE = 0.65;
+    // Set up a variable for each launch wheel to set power level
+    private double launchPower = 0;
 
     private double launchTrim = 0; // TODO: This is buggy - always runs
+
+    private final ElapsedTime automatedShootTimer = new ElapsedTime();
+    private boolean automatedShootRunning = false;
 
     //servo claw not in use
     //static final int    CYCLE_MS    =   50;     // period of each cycle
     /*
-    * static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
-    * static final double MAX_POS     =  1.0;     // Maximum rotational position
-    * static final double MIN_POS     =  0.0;     // Minimum rotational position
-    */
+     * static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
+     * static final double MAX_POS     =  1.0;     // Maximum rotational position
+     * static final double MIN_POS     =  0.0;     // Minimum rotational position
+     */
     //Define class members
     /*Servo   clawServo; // Servo not in use
-    *Servo   hingeServo; // Standard servo
-    *CRServo   hingeServo; // Continuous servo
-    *double  clawPosition = 0.50;  //guessing middle is 0.50
-    *double  hingePosition = 1; //up position is one
-    */
+     *Servo   hingeServo; // Standard servo
+     *CRServo   hingeServo; // Continuous servo
+     *double  clawPosition = 0.50;  //guessing middle is 0.50
+     *double  hingePosition = 1; //up position is one
+     */
 
     //Servo for release mechanism (gate) currently unused
     private Servo gateServo;
@@ -126,13 +133,13 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     //double hingePower = 0; // Continuous servo.  0.5 is off.  0.0 and 1.0 are the min and max.
     //boolean rampUp = true;
 
-/*
- *  The code is written using a method called: encoderDrive(speed, leftInches, rightInches, timeoutS)
- *  that performs the actual movement.
- *  This method assumes that each movement is relative to the last stopping place.
- *  There are other ways to perform encoder based moves, but this method is probably the simplest.
- *  This code uses the RUN_TO_POSITION mode to enable the Motor controllers to generate the run profile
- */
+    /*
+     *  The code is written using a method called: encoderDrive(speed, leftInches, rightInches, timeoutS)
+     *  that performs the actual movement.
+     *  This method assumes that each movement is relative to the last stopping place.
+     *  There are other ways to perform encoder based moves, but this method is probably the simplest.
+     *  This code uses the RUN_TO_POSITION mode to enable the Motor controllers to generate the run profile
+     */
 
     /*
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;    // eg: TETRIX Motor Encoder
@@ -144,13 +151,13 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
     static final double     TURN_SPEED              = 0.5;
     */
 
-        @Override
+    @Override
     public void runOpMode() {
 
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
-        leftFrontDrive  = hardwareMap.get(DcMotor.class, "left_front_drive");
-        leftBackDrive  = hardwareMap.get(DcMotor.class, "left_back_drive");
+        leftFrontDrive = hardwareMap.get(DcMotor.class, "left_front_drive");
+        leftBackDrive = hardwareMap.get(DcMotor.class, "left_back_drive");
         rightFrontDrive = hardwareMap.get(DcMotor.class, "right_front_drive");
         rightBackDrive = hardwareMap.get(DcMotor.class, "right_back_drive");
 
@@ -177,113 +184,99 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
 
         // Send telemetry message to indicate successful Encoder reset
         //telemetry.addData("Arm location starting at",  "%7d",
-                //armDrive.getCurrentPosition());
+        //armDrive.getCurrentPosition());
 
-            // Wait for the start button
+        // Wait for the start button
         // telemetry.addData(">", "Press Start to scan Servo." );
         // telemetry.update();
         waitForStart();
 
 
+        // ########################################################################################
+        // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
+        // ########################################################################################
+        // Most robots need the motors on one side to be reversed to drive forward.
+        // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
+        // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
+        // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
+        // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
+        // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
+        // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
+        leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
+        rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
 
+        // TODO: Set direction for the launch mechanism
+        rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
+        leftLaunchDrive.setDirection(DcMotor.Direction.FORWARD);
 
-            // ########################################################################################
-            // !!!            IMPORTANT Drive Information. Test your motor directions.            !!!!!
-            // ########################################################################################
-            // Most robots need the motors on one side to be reversed to drive forward.
-            // The motor reversals shown here are for a "direct drive" robot (the wheels turn the same direction as the motor shaft)
-            // If your robot has additional gear reductions or uses a right-angled drive, it's important to ensure
-            // that your motors are turning in the correct direction.  So, start out with the reversals here, BUT
-            // when you first test your robot, push the left joystick forward and observe the direction the wheels turn.
-            // Reverse the direction (flip FORWARD <-> REVERSE ) of any wheel that runs backward
-            // Keep testing until ALL the wheels move the robot forward when you push the left joystick forward.
-            leftFrontDrive.setDirection(DcMotor.Direction.REVERSE);
-            leftBackDrive.setDirection(DcMotor.Direction.REVERSE);
-            rightFrontDrive.setDirection(DcMotor.Direction.FORWARD);
-            rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
+        // Wait for the game to start (driver presses START)
+        telemetry.addData("Status", "Initialized");
+        telemetry.update();
 
-            // TODO: Set direction for the launch mechanism
-            rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
-            leftLaunchDrive.setDirection(DcMotor.Direction.FORWARD);
+        waitForStart();
+        runtime.reset();
 
-            // Wait for the game to start (driver presses START)
-            telemetry.addData("Status", "Initialized");
-            telemetry.update();
+        //int targetTicks = 0;
 
-            waitForStart();
-            runtime.reset();
-
-            //int targetTicks = 0;
-
-            //start with the claw closed
-            //boolean clawOpen= false;
+        //start with the claw closed
+        //boolean clawOpen= false;
 
         // run until the end of the match (driver presses STOP)
-            while (opModeIsActive()) {
-                double max;
-                //double max2;
+        while (opModeIsActive()) {
+            double max;
+            //double max2;
 
-                // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
-                double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
-                double lateral = gamepad1.left_stick_x;
-                double yaw = gamepad1.right_stick_x;
+            // POV Mode uses left joystick to go forward & strafe, and right joystick to rotate.
+            double axial = -gamepad1.left_stick_y;  // Note: pushing stick forward gives negative value
+            double lateral = gamepad1.left_stick_x;
+            double yaw = gamepad1.right_stick_x;
 
-                // Combine the joystick requests for each axis-motion to determine each wheel's power.
-                // Set up a variable for each drive wheel to save the power level for telemetry.
-                double leftFrontPower = axial + lateral + yaw;
-                double rightFrontPower = axial - lateral - yaw;
-                double leftBackPower = axial - lateral + yaw;
-                double rightBackPower = axial + lateral - yaw;
+            // Combine the joystick requests for each axis-motion to determine each wheel's power.
+            // Set up a variable for each drive wheel to save the power level for telemetry.
+            double leftFrontPower = axial + lateral + yaw;
+            double rightFrontPower = axial - lateral - yaw;
+            double leftBackPower = axial - lateral + yaw;
+            double rightBackPower = axial + lateral - yaw;
 
-                //gamepad2 - control the arms - right joystick up to extend, down to retract
-                //double axial2 = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
+            //gamepad2 - control the arms - right joystick up to extend, down to retract
+            //double axial2 = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
 
-                //calculate arm power based on joystick from gamepad2
-                //double armPower = axial2;
-                //Overiding armPower to keep the telescoping arm from falling
-                //if (armPower == 0) {
-                    //armPower = 0.05;
+            //calculate arm power based on joystick from gamepad2
+            //double armPower = axial2;
+            //Overiding armPower to keep the telescoping arm from falling
+            //if (armPower == 0) {
+            //armPower = 0.05;
 
-                //gamepad2 - control the launcher - right joystick to launch
-                //double launchPower = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
+            //gamepad2 - control the launcher - right joystick to launch
+            //double launchPower = -gamepad2.right_stick_y;  // Note: pushing stick forward gives negative value
 
-                //gamepad2 - control launch mechanism - right bumper pressed for release
-                boolean rightBumperPressed = gamepad2.right_bumper;
-                boolean leftBumperPressed = gamepad2.left_bumper;
+            //gamepad2 - control launch mechanism - right bumper pressed for release
+            boolean rightBumperPressed = gamepad2.right_bumper;
+            boolean leftBumperPressed = gamepad2.left_bumper;
 
-                // Set up a variable for each launch wheel to set power level
-                double launchPower;
+            //dpad up pressed for addition
+            boolean dpadUpPressed = gamepad2.dpad_up;
 
-                // Control launcher movement through bumper
-                if (leftBumperPressed) {
-                    launchPower = LAUNCH_POWER_MORE;
-                } else if (rightBumperPressed){
-                    launchPower = LAUNCH_POWER_LESS;
-                } else {
-                    launchPower = 0;
-                }
+            //dpad down pressed for subtraction
+            boolean dpadDownPressed = gamepad2.dpad_down;
 
-                //dpad up pressed for addition
-                boolean dpadUpPressed = gamepad2.dpad_up;
+            //control launch velocity trim through bumpers
+            if (dpadUpPressed) {
+                launchTrim -= 0.01;
+            } else if (dpadDownPressed) {
+                launchTrim += 0.01;
+            }
 
-                //dpad down pressed for subtraction
-                boolean dpadDownPressed = gamepad2.dpad_down;
+            //gamepad2 - control arm hinge - dpad_down pressed for lowest point
+            //boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
 
-                //control launch velocity trim through bumpers
-                if (dpadUpPressed) {
-                    launchTrim -= 0.01;
-                } else if (dpadDownPressed) {
-                    launchTrim += 0.01;
-                }
+            //gamepad2 - control arm hinge - dpad_up pressed for highest point
+            //boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
 
-                //gamepad2 - control arm hinge - dpad_down pressed for lowest point
-                //boolean dpadDownPressed = gamepad2.dpad_down;  // dpad down button gamepad 2
-
-                //gamepad2 - control arm hinge - dpad_up pressed for highest point
-                //boolean dpadUpPressed = gamepad2.dpad_up;  // dpad up button gamepad 2
-
-                //gamepad2 - control arm hinge - dpad_left pressed for intermediate position
-                //boolean dpadLeftPressed = gamepad2.dpad_left;  // dpad left button gamepad 2
+            //gamepad2 - control arm hinge - dpad_left pressed for intermediate position
+            //boolean dpadLeftPressed = gamepad2.dpad_left;  // dpad left button gamepad 2
 
                 /*
                 // Control hinge movement through buttons
@@ -296,8 +289,8 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 }
                 */
 
-                // Control hinge movement through buttons
-                // TODO: find the right values by testing
+            // Control hinge movement through buttons
+            // TODO: find the right values by testing
                 /* if (dpadDownPressed) { // Hinge all the way down
                     hingePosition = 0.0;
                 } else if (dpadUpPressed) { // Hinge all the way up
@@ -307,13 +300,13 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 }
                  */
 
-                //left bumper pressed for subtraction
-                //boolean leftBumperPressed = gamepad2.left_bumper; //
+            //left bumper pressed for subtraction
+            //boolean leftBumperPressed = gamepad2.left_bumper; //
 
-                //right bumper pressed for addition
-                //boolean rightBumperPressed = gamepad2.right_bumper;
+            //right bumper pressed for addition
+            //boolean rightBumperPressed = gamepad2.right_bumper;
 
-                //control hinge trim through bumpers
+            //control hinge trim through bumpers
                 /*if (leftBumperPressed) {
                     hingeTrim -= 0.01;
                 } else if (rightBumperPressed) {
@@ -321,19 +314,19 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 }
                  */
 
-                //gamepad2 - control claw intake - a pressed for open
-                //boolean buttonAPressed = gamepad2.a;  // A gamepad 2
+            //gamepad2 - control claw intake - a pressed for open
+            //boolean buttonAPressed = gamepad2.a;  // A gamepad 2
 
-                //gamepad2 - control claw intake - b pressed for close
-                //boolean buttonBPressed = gamepad2.b;  // B gamepad 2
+            //gamepad2 - control claw intake - b pressed for close
+            //boolean buttonBPressed = gamepad2.b;  // B gamepad 2
 
-                //gamepad2 - control gate movement - x pressed for open
-                boolean buttonXPressed = gamepad2.x;
+            //gamepad2 - control gate movement - x pressed for open
+            boolean buttonXPressed = gamepad2.x;
 
-                //gamepad2 - control gate movement - y pressed for open
-                boolean buttonYPressed = gamepad2.y;
+            //gamepad2 - control gate movement - y pressed for open
+            boolean buttonYPressed = gamepad2.y;
 
-                // Control claw movement through buttons
+            // Control claw movement through buttons
                 /*if (buttonAPressed) { //close the claw
                     clawPosition = 0.50;
                 } else if (buttonBPressed) { //open the claw
@@ -341,18 +334,35 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 }
                  */
 
-                //Control gate movement through buttons
+            //Control gate movement through buttons
+            if (!automatedShootRunning) {
                 if (buttonXPressed) { //down position
-                    gatePosition = 0;
+                    gatePosition = GATE_DOWN;
                 } else if (buttonYPressed) { //up position
-                    gatePosition = 0.6;
+                    gatePosition = GATE_UP;
                 }
 
-                //Button pressed for automated shooting
-                float rightTriggerPressed = gamepad2.right_trigger;
-                if (rightTriggerPressed > 0.2 ) {
-                   automatedShoot();
+                // Control launcher movement through bumper
+                if (leftBumperPressed) {
+                    launchPower = LAUNCH_POWER_MORE;
+                } else if (rightBumperPressed) {
+                    launchPower = LAUNCH_POWER_LESS;
+                } else {
+                    launchPower = 0;
                 }
+            }
+
+            //Button pressed for automated shooting
+            if (gamepad2.left_trigger > 0.2) {
+                automatedShoot(LAUNCH_POWER_MORE);
+
+            } else if (gamepad2.right_trigger > 0.2) {
+                automatedShoot(LAUNCH_POWER_LESS);
+
+            } else {
+                endAutomatedShoot();
+            }
+
 
 
                 /*
@@ -365,39 +375,38 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
                 */
 
 
+            // Normalize the values so no wheel power exceeds 100%
+            // This ensures that the robot maintains the desired motion.
+            max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+            max = Math.max(max, Math.abs(leftBackPower));
+            max = Math.max(max, Math.abs(rightBackPower));
 
-                // Normalize the values so no wheel power exceeds 100%
-                // This ensures that the robot maintains the desired motion.
-                max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
-                max = Math.max(max, Math.abs(leftBackPower));
-                max = Math.max(max, Math.abs(rightBackPower));
+            if (max > 1.0) {
+                leftFrontPower /= max;
+                rightFrontPower /= max;
+                leftBackPower /= max;
+                rightBackPower /= max;
+            }
 
-                if (max > 1.0) {
-                    leftFrontPower /= max;
-                    rightFrontPower /= max;
-                    leftBackPower /= max;
-                    rightBackPower /= max;
-                }
+            int divider = 3;
+            // if button LB is pressed, the speed will increase
+            boolean buttonLBPressed = gamepad1.left_bumper;  // B gamepad 1
+            if (!buttonLBPressed) {
+                leftFrontPower /= divider;
+                rightFrontPower /= divider;
+                leftBackPower /= divider;
+                rightBackPower /= divider;
+            }
 
-                int divider = 3;
-                // if button LB is pressed, the speed will increase
-                boolean buttonLBPressed = gamepad1.left_bumper;  // B gamepad 1
-                if (buttonLBPressed == false) {
-                    leftFrontPower /= divider;
-                    rightFrontPower /= divider;
-                    leftBackPower /= divider;
-                    rightBackPower /= divider;
-                }
-
-                // This is test code:
-                //
-                // Uncomment the following code to test your motor directions.
-                // Each button should make the corresponding motor run FORWARD.
-                //   1) First get all the motors to take to correct positions on the robot
-                //      by adjusting your Robot Configuration if necessary.
-                //   2) Then make sure they run in the correct direction by modifying the
-                //      the setDirection() calls above.
-                // Once the correct motors move in the correct direction re-comment this code.
+            // This is test code:
+            //
+            // Uncomment the following code to test your motor directions.
+            // Each button should make the corresponding motor run FORWARD.
+            //   1) First get all the motors to take to correct positions on the robot
+            //      by adjusting your Robot Configuration if necessary.
+            //   2) Then make sure they run in the correct direction by modifying the
+            //      the setDirection() calls above.
+            // Once the correct motors move in the correct direction re-comment this code.
 
             /*
             leftFrontPower  = gamepad1.x ? 1.0 : 0.0;  // X gamepad
@@ -406,125 +415,143 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
             rightBackPower  = gamepad1.b ? 1.0 : 0.0;  // B gamepad
             */
 
-                // Send calculated power to wheels
-                leftFrontDrive.setPower(leftFrontPower);
-                rightFrontDrive.setPower(rightFrontPower);
-                leftBackDrive.setPower(leftBackPower);
-                rightBackDrive.setPower(rightBackPower);
+            // Send calculated power to wheels
+            leftFrontDrive.setPower(leftFrontPower);
+            rightFrontDrive.setPower(rightFrontPower);
+            leftBackDrive.setPower(leftBackPower);
+            rightBackDrive.setPower(rightBackPower);
 
-                // Send calculated power to telescoping arm
-                //armDrive.setPower(armPower);
+            // Send calculated power to telescoping arm
+            //armDrive.setPower(armPower);
 
-                // Set calculated power to launcher
-                leftLaunchDrive.setPower(launchPower);
-                rightLaunchDrive.setPower(launchPower);
+            // Set calculated power to launcher
+            leftLaunchDrive.setPower(launchPower);
+            rightLaunchDrive.setPower(launchPower);
 
-                //encoderDrive(0.5, targetTicks, 2);
+            //encoderDrive(0.5, targetTicks, 2);
 
-                // Set the servo to the new position and pause;
-                //clawServo.setPosition(clawPosition);
+            // Set the servo to the new position and pause;
+            //clawServo.setPosition(clawPosition);
 
-                // Set the servo to the new position and pause
-                //hingeServo.setPosition(hingePosition + hingeTrim); // Standard servo
+            // Set the servo to the new position and pause
+            //hingeServo.setPosition(hingePosition + hingeTrim); // Standard servo
 
-                //hingeServo.setPower(hingePower); // Continuous servo
+            //hingeServo.setPower(hingePower); // Continuous servo
 
-                //Set the gate servo to new position and pause
-                gateServo.setPosition(gatePosition);
+            //Set the gate servo to new position and pause
+            gateServo.setPosition(gatePosition);
 
-                // At button press, the gateServo go to its up position
-                // At 1500ms: go 1/3 of the way down
-                // At 1700ms: go 2/3 of the way down
-                // At 1900ms: go to the down position
-                // If direct control buttons are pressed, this loop should stop
-                // If button pressed again, restart the sequence
-                // Make a variable for while the gate is lowering
+            // At button press, the gateServo go to its up position
+            // At 1500ms: go 1/3 of the way down
+            // At 1700ms: go 2/3 of the way down
+            // At 1900ms: go to the down position
+            // If direct control buttons are pressed, this loop should stop
+            // If button pressed again, restart the sequence
+            // Make a variable for while the gate is lowering
 
-                // Show the elapsed game time and wheel power.
-                telemetry.addData("Status", "Run Time: " + runtime.toString());
-                telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
-                telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
-                telemetry.addData("Launcher Left/Right", "%4.2f", launchPower);
-                telemetry.addData("gatePosition", "%4.2f", gatePosition);
-                telemetry.addData("Trim amount", "Trim amount", launchTrim);
-                //telemetry.addData("Arm", "%5.2f", armPower);
-                // telemetry.update();
+            // Show the elapsed game time and wheel power.
+            telemetry.addData("Status", "Run Time: " + runtime.toString());
+            telemetry.addData("Front left/Right", "%4.2f, %4.2f", leftFrontPower, rightFrontPower);
+            telemetry.addData("Back  left/Right", "%4.2f, %4.2f", leftBackPower, rightBackPower);
+            telemetry.addData("Launcher Left/Right", "%4.2f", launchPower);
+            telemetry.addData("gatePosition", "%4.2f", gatePosition);
+            telemetry.addData("Trim amount", "Trim amount", launchTrim);
+            //telemetry.addData("Arm", "%5.2f", armPower);
+            // telemetry.update();
 
-                // Display the current value
-                // telemetry.addData("Servo Max", "%5.2f", MAX_POS);
-                // telemetry.addData("Servo Min", "%5.2f", MIN_POS);
-                //telemetry.addData("Claw Position", "%5.2f", clawPosition);
-                //telemetry.addData("Hinge Position", "%5.2f", hingePosition); // Standard servo
-                //telemetry.addData("Hinge power", "%4.2f", hingePower);
-                //telemetry.addData("Trim amount","%4.2f", hingeTrim);
-                telemetry.addData(">", "Press Stop to end test.");
-                telemetry.update();
-
-                sleep(CYCLE_MS);
-                idle();
-            }
-
-            // Signal done;
-            telemetry.addData(">", "Done");
+            // Display the current value
+            // telemetry.addData("Servo Max", "%5.2f", MAX_POS);
+            // telemetry.addData("Servo Min", "%5.2f", MIN_POS);
+            //telemetry.addData("Claw Position", "%5.2f", clawPosition);
+            //telemetry.addData("Hinge Position", "%5.2f", hingePosition); // Standard servo
+            //telemetry.addData("Hinge power", "%4.2f", hingePower);
+            //telemetry.addData("Trim amount","%4.2f", hingeTrim);
+            telemetry.addData(">", "Press Stop to end test.");
             telemetry.update();
+
+            sleep(CYCLE_MS);
+            idle();
         }
 
-    public void automatedShoot() {
-
-        //Step: Launch wheels rolling
-        leftLaunchDrive.setPower(LAUNCH_POWER_LESS);
-        rightLaunchDrive.setPower(LAUNCH_POWER_LESS);
-
-        //Step: Wait for wheel momentum
-        sleep(2000);
-        telemetry.addData("Step","3");
+        // Signal done;
+        telemetry.addData(">", "Done");
         telemetry.update();
+    }
 
-        //Step: Servo push the ball up 1
-        gateServo.setPosition(GATE_UP);
-        telemetry.addData("Step", "4");
-        telemetry.update();
 
-        //Step: sleep
-        sleep(1000);
+    public void automatedShoot(double targetLaunchPower) {
+        // Track whether we're mid-shoot.  Only reset the timer on first entry
+        if (!automatedShootRunning) {
+            automatedShootTimer.reset();
+            automatedShootRunning = true;
+        }
 
-        //Step: put the gate down
-        gateServo.setPosition(GATE_DOWN);
-        telemetry.addData("Gate", "down");
-        telemetry.update();
+        // Save the timer value so we don't keep re-reading the timer.
+        // Re-reading the timer on every 'if' evaluation would introduce time gaps.
+        double elapsedTime = automatedShootTimer.seconds();
+        telemetry.addData("Elapsed Time", "%4.2f", elapsedTime);
+        if (elapsedTime < 2.0) {
+            // First 2 seconds
 
-        //Step: Pause
-        sleep(500);
+            // Step: Launch wheels rolling and wait for wheel momentum
+            // Set the variable. Main loop will send this power level to motors.
+            launchPower = targetLaunchPower;
 
-        //Step: Servo push ball 2
-        gateServo.setPosition(GATE_UP);
-        telemetry.addData("Gate", "Up");
-        telemetry.update();
+            // Don't send the telemetry yet. Just add lines.
+            telemetry.addData("Step 1","Setting power");
 
-        //Step: sleep
-        sleep(1000);
+        } else if (elapsedTime < 2.75) {
+            // Do this in seconds 2-3
 
-        //Step: put the gate down
-        gateServo.setPosition(GATE_DOWN);
-        telemetry.addData("Gate", "down");
-        telemetry.update();
+            // Step: Send gate up to push ball 1
+            gatePosition = GATE_UP;
 
-        //Step: Pause
-        sleep(500);
+            // Don't send the telemetry yet. Just add lines.
+            telemetry.addData("Step 2 Gate", "Up");
 
-        //Step: Servo push ball 3
-        gateServo.setPosition(GATE_UP);
-        telemetry.addData("Gate", "Up");
-        telemetry.update();
+        } else if (elapsedTime < 3.25) {
+            // Do this in seconds 3.0 - 3.5
 
-        //Step: sleep
-        sleep(1000);
+            //Step: put the gate down
+            gatePosition = GATE_DOWN;
+            telemetry.addData("Gate", "down");
 
-        //Step: put the gate down
-        gateServo.setPosition(GATE_DOWN);
-        telemetry.addData("Gate", "down");
-        telemetry.update();
+        } else if (elapsedTime < 3.75) {
+            // Step: Send gate up to push ball 2
+            gatePosition = GATE_UP;
+            telemetry.addData("Gate", "Up");
 
+        } else if (elapsedTime < 4.75) {
+            //Step: put the gate down
+            gatePosition = GATE_DOWN;
+            telemetry.addData("Gate", "down");
+
+        } else if (elapsedTime < 5.25) {
+            // Step: Send gate up to push ball 3
+            gatePosition = GATE_UP;
+            telemetry.addData("Gate", "Up");
+
+        }
+
+        telemetry.addData("Automated Shoot", "True");
+    }
+    /*
+     * Method to end an automated shoot and reset any motors and servos.
+     */
+    public void endAutomatedShoot() {
+        telemetry.addData("Starting Automated Shoot", "False");
+
+        if (automatedShootRunning) {
+            automatedShootRunning = false;
+
+            // Put the gate down
+            gatePosition = GATE_DOWN;
+
+            // Turn off launch motors
+            launchPower = 0;
+        }
+
+        telemetry.addData("Automated Shoot", "False");
     }
 
     /*
