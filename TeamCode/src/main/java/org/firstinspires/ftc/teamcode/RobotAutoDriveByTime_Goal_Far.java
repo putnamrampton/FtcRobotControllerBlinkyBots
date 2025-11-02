@@ -29,12 +29,12 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import static org.firstinspires.ftc.teamcode.BasicOmniOpMode_Linear_BB_25_26.LAUNCH_POWER_LESS;
+
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -42,8 +42,6 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
-import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 import org.firstinspires.ftc.vision.VisionPortal;
@@ -51,7 +49,6 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /*
  * This OpMode illustrates the concept of driving a path based on time.
@@ -67,8 +64,8 @@ import java.util.concurrent.TimeUnit;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Red Goal", group="Robot")
-public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
+@Autonomous(name="Goal Shooting Far", group="Robot")
+public class RobotAutoDriveByTime_Goal_Far extends LinearOpMode {
 
     /* Declare OpMode members. */
     private DcMotor leftFrontDrive = null;
@@ -78,10 +75,6 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
 
     //telescoping arm
     //private DcMotor armDrive = null;
-
-    // Launchers
-    private DcMotor leftLaunchDrive = null;
-    private DcMotor rightLaunchDrive = null;
 
     /*
     servo claw
@@ -191,8 +184,9 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
         leftFrontDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         leftFrontDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        rightLaunchDrive = hardwareMap.get(DcMotor.class, "right_launch_drive"); // Port 0
-        leftLaunchDrive = hardwareMap.get(DcMotor.class, "left_launch_drive");
+        DcMotor rightLaunchDrive = hardwareMap.get(DcMotor.class, "right_launch_drive"); // Port 0
+        // Launchers
+        DcMotor leftLaunchDrive = hardwareMap.get(DcMotor.class, "left_launch_drive");
 
         // Set up launch motors
         rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -387,15 +381,12 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
         // Step: Strafe back and to the right to observation zone
         driveByTime(-0.25, 0.5, 0, 2,0);
         */
-
-        // Step: Back up
-        driveByTime(-0.6, 0,0,1,0);
-        telemetry.addData("Step", "1");
-        telemetry.update();
+        //Step: Wait for other team shooting
+        sleep(15000);
 
         //Step: Launch wheels rolling
-        leftLaunchDrive.setPower(LAUNCH_SPEED);
-        rightLaunchDrive.setPower(LAUNCH_SPEED);
+        leftLaunchDrive.setPower(LAUNCH_POWER_LESS);
+        rightLaunchDrive.setPower(LAUNCH_POWER_LESS);
         telemetry.addData("Step", "2");
         telemetry.update();
 
@@ -418,7 +409,7 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
         telemetry.update();
 
         //Step: Pause
-        sleep(500);
+        sleep(750);
 
         //Step: Servo push ball 2
         gateServo.setPosition(GATE_UP);
@@ -434,7 +425,7 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
         telemetry.update();
 
         //Step: Pause
-        sleep(500);
+        sleep(750);
 
         //Step: Servo push ball 3
         gateServo.setPosition(GATE_UP);
@@ -449,6 +440,11 @@ public class RobotAutoDriveByTime_Goal_Red extends LinearOpMode {
         telemetry.addData("Gate", "down");
         telemetry.update();
 
+        //Step: back up
+        driveByTime(-0.3, 0,0,1,0);
+
+        //Step: drive forward
+        driveByTime(0.6,0,0,1,0);
 
         // Step: Park and wait for TeleOp
         // TODO
