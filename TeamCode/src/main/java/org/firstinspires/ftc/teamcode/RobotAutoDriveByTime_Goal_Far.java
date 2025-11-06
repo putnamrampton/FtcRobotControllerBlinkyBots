@@ -150,7 +150,7 @@ public class RobotAutoDriveByTime_Goal_Far extends LinearOpMode {
     static final double GATE_DOWN = 0;
 
     // Set constants for launch speed
-    static final double LAUNCH_SPEED = 0.5; // TODO: test value
+    static final double LAUNCH_SPEED = 0.56; // TODO: test value
 
     // * Setup for Drive by Time
     private final ElapsedTime     runtime = new ElapsedTime();
@@ -385,8 +385,8 @@ public class RobotAutoDriveByTime_Goal_Far extends LinearOpMode {
         sleep(15000);
 
         //Step: Launch wheels rolling
-        leftLaunchDrive.setPower(LAUNCH_POWER_LESS);
-        rightLaunchDrive.setPower(LAUNCH_POWER_LESS);
+        leftLaunchDrive.setPower(LAUNCH_SPEED);
+        rightLaunchDrive.setPower(LAUNCH_SPEED);
         telemetry.addData("Step", "2");
         telemetry.update();
 

@@ -208,8 +208,8 @@ public class BasicOmniOpMode_Linear_BB_25_26 extends LinearOpMode {
         rightBackDrive.setDirection(DcMotor.Direction.FORWARD);
 
         // TODO: Set direction for the launch mechanism
-        rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
         leftLaunchDrive.setDirection(DcMotor.Direction.FORWARD);
+        rightLaunchDrive.setDirection(DcMotor.Direction.REVERSE);
 
         // Wait for the game to start (driver presses START)
         telemetry.addData("Status", "Initialized");
